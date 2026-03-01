@@ -23,6 +23,6 @@ const cart = createCartClient({
 Cart and price operations use independent clients. This means you can point them at different backends if needed, or only instantiate the one you need:
 
 ```ts
-const cart = createCartClient({ baseUrl: 'https://commerce.example.com' })
-const prices = createPriceClient({ baseUrl: 'https://pricelists.example.com' })
+const cart = createCartClient({ baseUrl: 'https://core.your-instance.hantera.cloud' })
+const prices = createPriceClient({ baseUrl: 'https://core.your-instance.hantera.cloud' })
 ```
