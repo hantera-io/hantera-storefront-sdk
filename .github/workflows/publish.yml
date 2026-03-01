@@ -29,10 +29,9 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           cd packages/storefront-sdk
-          npm version "$VERSION" --no-git-tag-version
+          npm pkg set "version=$VERSION"
 
       - name: Publish
-        run: npm publish --access public --provenance
-        working-directory: packages/storefront-sdk
+        run: yarn workspace @hantera/storefront-sdk npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
