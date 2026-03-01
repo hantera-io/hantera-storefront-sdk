@@ -61,14 +61,17 @@ export interface Cart {
   phone?: string
 }
 
-export interface CartError {
-  error: {
-    code: string
-    message: string
-  }
+export interface CartErrorItem {
+  code: string
+  message: string
+  details?: Record<string, unknown>
 }
 
-export type CartMutationResponse = null | Cart | CartError
+export interface CartErrors {
+  errors: CartErrorItem[]
+}
+
+export type CartMutationResponse = Cart | CartErrors
 
 export interface CreateCartRequest {
   currencyCode: string
@@ -93,6 +96,11 @@ export interface SetAddressRequest {
   invoiceAddress?: Address | 'unset'
 }
 
+export interface SetQuantityRequest {
+  cartItemId: string
+  quantity: number
+}
+
 export interface SetFieldRequest {
   value: unknown
 }
@@ -104,6 +112,11 @@ export interface CartEventHandlers {
   onConnectionError?: (error: Event) => void
 }
 
-export function isCartError(response: unknown): response is CartError {
-  return (response != null && typeof response === 'object' && 'error' in response) ?? false
+export function isCartErrors(response: unknown): response is CartErrors {
+  return (
+    response != null &&
+    typeof response === 'object' &&
+    'errors' in response &&
+    Array.isArray((response as any).errors)
+  )
 }

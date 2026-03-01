@@ -1,11 +1,12 @@
 export { CartClient, createCartClient } from './cart-client'
 export type { CartClientOptions } from './cart-client'
-export { isCartError } from './types'
+export { isCartErrors } from './types'
 export type {
   AddItemRequest,
   Address,
   Cart,
-  CartError,
+  CartErrorItem,
+  CartErrors,
   CartEventHandlers,
   CartItem,
   CartMutationResponse,

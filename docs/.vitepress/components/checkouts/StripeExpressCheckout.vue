@@ -62,6 +62,7 @@ function initElements() {
     amount: paymentTotal.value,
     currency: currencyCode,
     appearance: appearance.value,
+    capture_method: 'manual',
   })
 
   const expressEl = elements.create('expressCheckout')
@@ -117,11 +118,14 @@ function initElements() {
 
       emit('completing')
 
+      const returnUrl = new URL(window.location.href)
+      returnUrl.searchParams.set('cart', props.cartId)
+
       const { error } = await stripe.confirmPayment({
         elements,
         clientSecret: res.clientSecret,
         confirmParams: {
-          return_url: window.location.href,
+          return_url: returnUrl.toString(),
         },
       })
 

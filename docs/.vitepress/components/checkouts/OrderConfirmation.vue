@@ -68,7 +68,7 @@ function formatAddress(address: any): string {
       </div>
 
       <div class="detail-section" v-if="cart.invoiceAddress">
-        <h4>Billing Address</h4>
+        <h4>Invoice Address</h4>
         <p class="address-text">{{ formatAddress(cart.invoiceAddress) }}</p>
       </div>
 

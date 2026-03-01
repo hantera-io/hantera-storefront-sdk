@@ -27,6 +27,8 @@ const cart = createCartClient({
 
 ## Real-time Updates
 
+All mutation methods return the updated cart state directly, so you can update your UI immediately from the response. SSE subscriptions are optional but useful for syncing state across multiple tabs or when other actors (e.g. payment webhooks) update the cart.
+
 The cart supports Server-Sent Events (SSE) for real-time state synchronization:
 
 ```ts

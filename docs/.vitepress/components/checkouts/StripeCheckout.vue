@@ -184,19 +184,24 @@ async function handleSubmit() {
 
     const { clientSecret } = res
 
-    emit('completing')
+    const returnUrl = new URL(window.location.href)
+    returnUrl.searchParams.set('cart', props.cartId)
 
     const { error } = await stripe.value.confirmPayment({
       elements,
       clientSecret,
+      redirect: 'if_required',
       confirmParams: {
-        return_url: window.location.href,
+        return_url: returnUrl.toString(),
       },
     })
 
     if (error) {
       errorMessage.value = error.message
       submitting.value = false
+    }
+    else {
+      emit('completing')
     }
   } catch (e: any) {
     errorMessage.value = e.message

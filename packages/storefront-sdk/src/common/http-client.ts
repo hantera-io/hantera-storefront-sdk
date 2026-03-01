@@ -24,12 +24,17 @@ export class HttpClient {
 
     const response = await fetch(url, options)
 
-    if (!response.ok) {
-      throw new Error(await response.text())
-    }
-
     if (response.status === 204) {
       return null as T
+    }
+
+    const contentType = response.headers.get('content-type') ?? ''
+    if (contentType.includes('application/json')) {
+      return response.json()
+    }
+
+    if (!response.ok) {
+      throw new Error(await response.text())
     }
 
     return response.json()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted, watch } from 'vue'
-import { createCartClient, isCartError } from '@hantera/storefront-sdk/cart'
-import type { Cart } from '@hantera/storefront-sdk/cart'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { createCartClient, isCartErrors } from '@hantera/storefront-sdk/cart'
+import type { Cart, CartErrors, CartMutationResponse } from '@hantera/storefront-sdk/cart'
 import { resolveBaseUrl } from '../utils/resolve-base-url'
 import CheckoutSelector from './checkouts/CheckoutSelector.vue'
 import StripeCheckout from './checkouts/StripeCheckout.vue'
@@ -36,6 +36,8 @@ const currencyCode = ref('SEK')
 const channelKey = ref('retail_SE')
 const productNumber = ref('')
 const quantity = ref(1)
+const couponCode = ref('')
+const couponError = ref<string | null>(null)
 const checkoutView = ref<CheckoutView>('select')
 let eventSource: EventSource | null = null
 
@@ -105,8 +107,8 @@ async function createCart() {
       currencyCode: currencyCode.value,
       channelKey: channelKey.value,
     })
-    if (isCartError(response)) {
-      error.value = `${(response as any).error.code}: ${(response as any).error.message}`
+    if (isCartErrors(response)) {
+      handleErrors(response)
       return
     }
     const newCart: StoredCart = {
@@ -164,17 +166,41 @@ function unsubscribe() {
   }
 }
 
+const COUPON_ERROR_CODES = new Set(['INVALID_COUPON', 'COUPON_NOT_FOUND'])
+
+function handleErrors(result: CartErrors) {
+  for (const err of result.errors) {
+    if (COUPON_ERROR_CODES.has(err.code)) {
+      couponError.value = err.message
+    } else {
+      error.value = `${err.code}: ${err.message}`
+    }
+  }
+}
+
+function handleMutationResult(result: CartMutationResponse): boolean {
+  syncing.value = false
+  if (isCartErrors(result)) {
+    handleErrors(result)
+    return false
+  }
+  cart.value = result
+  return true
+}
+
 async function addItem() {
   if (!currentCartId.value || !productNumber.value.trim()) return
   syncing.value = true
   error.value = null
   try {
-    await client.value.addItem(currentCartId.value, {
+    const result = await client.value.addItem(currentCartId.value, {
       productNumber: productNumber.value.trim(),
       quantity: quantity.value,
     })
-    productNumber.value = ''
-    quantity.value = 1
+    if (handleMutationResult(result)) {
+      productNumber.value = ''
+      quantity.value = 1
+    }
   } catch (e: any) {
     syncing.value = false
     error.value = e.message
@@ -185,7 +211,52 @@ async function removeItem(cartItemId: string) {
   if (!currentCartId.value) return
   syncing.value = true
   try {
-    await client.value.removeItem(currentCartId.value, { cartItemId })
+    const result = await client.value.removeItem(currentCartId.value, { cartItemId })
+    handleMutationResult(result)
+  } catch (e: any) {
+    syncing.value = false
+    error.value = e.message
+  }
+}
+
+async function setItemQuantity(cartItemId: string, newQuantity: number) {
+  if (!currentCartId.value || newQuantity < 1) return
+  syncing.value = true
+  error.value = null
+  try {
+    const result = await client.value.setQuantity(currentCartId.value, {
+      cartItemId,
+      quantity: newQuantity,
+    })
+    handleMutationResult(result)
+  } catch (e: any) {
+    syncing.value = false
+    error.value = e.message
+  }
+}
+
+async function addCoupon() {
+  if (!currentCartId.value || !couponCode.value.trim()) return
+  syncing.value = true
+  couponError.value = null
+  try {
+    const result = await client.value.addCoupon(currentCartId.value, couponCode.value.trim())
+    if (handleMutationResult(result)) {
+      couponCode.value = ''
+    }
+  } catch (e: any) {
+    syncing.value = false
+    error.value = e.message
+  }
+}
+
+async function removeCoupon(code: string) {
+  if (!currentCartId.value) return
+  syncing.value = true
+  couponError.value = null
+  try {
+    const result = await client.value.removeCoupon(currentCartId.value, code)
+    handleMutationResult(result)
   } catch (e: any) {
     syncing.value = false
     error.value = e.message
@@ -241,6 +312,35 @@ function formatCurrency(amount: number): string {
 function formatDate(d: string): string {
   return new Date(d).toLocaleString()
 }
+
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search)
+  const redirectStatus = params.get('redirect_status')
+  const cartId = params.get('cart')
+
+  if (redirectStatus && cartId) {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('payment_intent')
+    url.searchParams.delete('payment_intent_client_secret')
+    url.searchParams.delete('redirect_status')
+    url.searchParams.delete('cart')
+    window.history.replaceState({}, '', url.toString())
+
+    const knownCart = storedCarts.value.find((c) => c.cartId === cartId)
+    if (!knownCart) return
+
+    if (redirectStatus === 'failed') {
+      selectCart(cartId)
+      error.value = 'Payment failed. Please try again.'
+      return
+    }
+
+    currentCartId.value = cartId
+    completing.value = true
+    resetStripeLoader()
+    subscribeToEvents(cartId)
+  }
+})
 
 onUnmounted(() => unsubscribe())
 </script>
@@ -335,7 +435,15 @@ onUnmounted(() => unsubscribe())
           <tbody>
             <tr v-for="item in cart.items" :key="item.cartItemId">
               <td><code>{{ item.productNumber }}</code></td>
-              <td>{{ item.quantity }}</td>
+              <td>
+                <input
+                  type="number"
+                  :value="item.quantity"
+                  min="1"
+                  class="qty-input"
+                  @change="(e) => setItemQuantity(item.cartItemId, parseInt((e.target as HTMLInputElement).value) || 1)"
+                />
+              </td>
               <td>{{ formatCurrency(item.unitPrice) }}</td>
               <td>{{ formatCurrency(item.total) }}</td>
               <td><button @click="removeItem(item.cartItemId)" class="btn-danger btn-sm">×</button></td>
@@ -347,6 +455,25 @@ onUnmounted(() => unsubscribe())
         <div v-if="cart.items?.length" class="totals">
           <div>Total: <strong>{{ formatCurrency(cart.orderTotal) }}</strong></div>
           <div>Tax{{ cart.taxIncluded ? ' (incl)' : '' }}: {{ formatCurrency(cart.orderTaxTotal) }}</div>
+        </div>
+
+        <div class="coupon-section">
+          <div class="coupon-form">
+            <input
+              v-model="couponCode"
+              placeholder="Coupon code"
+              @keydown.enter="addCoupon"
+              @input="couponError = null"
+            />
+            <button @click="addCoupon" :disabled="!couponCode.trim()" class="btn-secondary btn-sm">Apply</button>
+          </div>
+          <div v-if="couponError" class="coupon-error">{{ couponError }}</div>
+          <div v-if="(cart as any).coupons?.length" class="coupon-list">
+            <span v-for="code in (cart as any).coupons" :key="code" class="coupon-tag">
+              {{ code }}
+              <button @click="removeCoupon(code)" class="coupon-remove">×</button>
+            </span>
+          </div>
         </div>
 
         <!-- Checkout section -->
@@ -431,7 +558,16 @@ onUnmounted(() => unsubscribe())
 .items-table { width: 100%; border-collapse: collapse; margin-bottom: 0.75rem; }
 .items-table th, .items-table td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid var(--vp-c-border); font-size: 0.85rem; }
 .items-table th { font-size: 0.75rem; text-transform: uppercase; color: var(--vp-c-text-2); }
+.qty-input { width: 50px; padding: 0.2rem 0.3rem; border: 1px solid var(--vp-c-border); border-radius: 4px; font-size: 0.85rem; text-align: center; }
 .totals { text-align: right; margin-bottom: 1rem; font-size: 0.9rem; }
+.coupon-section { margin-bottom: 1rem; max-width: 400px; }
+.coupon-form { display: flex; gap: 0.5rem; }
+.coupon-form input { flex: 1; padding: 0.4rem; border: 1px solid var(--vp-c-border); border-radius: 4px; font-size: 0.85rem; }
+.coupon-error { color: #dc3545; font-size: 0.8rem; margin-top: 0.3rem; }
+.coupon-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+.coupon-tag { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.2rem 0.5rem; background: var(--vp-c-bg-soft); border: 1px solid var(--vp-c-border); border-radius: 4px; font-size: 0.8rem; }
+.coupon-remove { background: none; border: none; cursor: pointer; color: var(--vp-c-text-2); font-size: 0.9rem; padding: 0 0.15rem; line-height: 1; }
+.coupon-remove:hover { color: #dc3545; }
 .checkout-section { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--vp-c-border); }
 .raw-data { margin-top: 1rem; }
 .raw-data pre { font-size: 0.75rem; overflow-x: auto; background: var(--vp-c-bg-soft); padding: 0.75rem; border-radius: 4px; }

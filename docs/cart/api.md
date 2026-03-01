@@ -22,6 +22,8 @@ const cart = createCartClient({
 
 ## Methods
 
+All mutation methods return a `CartMutationResponse` (`Cart | CartErrors`), providing the updated cart state immediately. This means you can update your UI from the mutation response without waiting for an SSE event round-trip.
+
 ### `createCart(request)`
 
 Creates a new cart.
@@ -51,14 +53,14 @@ Fetches the current cart state.
 ```ts
 const result = await cart.getCart(cartId)
 
-if (isCartError(result)) {
-  console.error(result.error.message)
+if (isCartErrors(result)) {
+  result.errors.forEach((e) => console.error(e.code, e.message))
 } else {
   console.log(result.items)
 }
 ```
 
-**Returns:** `Promise<Cart | CartError>`
+**Returns:** `Promise<Cart | CartErrors>`
 
 ---
 
@@ -99,6 +101,58 @@ await cart.removeItem(cartId, {
 | Field        | Type     | Description          |
 | ------------ | -------- | -------------------- |
 | `cartItemId` | `string` | Cart item identifier |
+
+**Returns:** `Promise<CartMutationResponse>`
+
+---
+
+### `setQuantity(cartId, request)`
+
+Sets the quantity of an existing cart item. The cart is re-validated (including price lookup) before applying the change.
+
+```ts
+await cart.setQuantity(cartId, {
+  cartItemId: 'item-uuid-here',
+  quantity: 3,
+})
+```
+
+**Parameters:**
+
+| Field        | Type     | Description              |
+| ------------ | -------- | ------------------------ |
+| `cartItemId` | `string` | Cart item identifier     |
+| `quantity`   | `number` | New quantity for the item |
+
+**Returns:** `Promise<CartMutationResponse>`
+
+---
+
+### `addCoupon(cartId, couponCode)`
+
+Adds a coupon code to the cart.
+
+```ts
+await cart.addCoupon(cartId, 'SUMMER2026')
+```
+
+**Returns:** `Promise<CartMutationResponse>`
+
+---
+
+### `removeCoupon(cartId, couponCode)`
+
+Removes a previously added coupon from the cart.
+
+```ts
+await cart.removeCoupon(cartId, 'SUMMER2026')
+```
+
+**Parameters:**
+
+| Field        | Type     | Description              |
+| ------------ | -------- | ------------------------ |
+| `couponCode` | `string` | The coupon code to remove |
 
 **Returns:** `Promise<CartMutationResponse>`
 
@@ -158,13 +212,22 @@ await cart.setPhone(cartId, '+46701234567')
 
 ### `setField(cartId, key, request)`
 
-Sets a custom field on the cart.
+Sets a custom field on the cart. Custom fields are namespaced internally to prevent collisions with standard cart properties — the key you provide is stored with a `field:` prefix, which is automatically stripped in the `fields` property of the cart response.
 
 ```ts
 await cart.setField(cartId, 'giftMessage', {
   value: 'Happy birthday!',
 })
+
+// The cart response will include: { fields: { giftMessage: 'Happy birthday!' } }
 ```
+
+**Parameters:**
+
+| Field   | Type      | Description                |
+| ------- | --------- | -------------------------- |
+| `key`   | `string`  | Custom field key           |
+| `value` | `unknown` | Value to store for the key |
 
 **Returns:** `Promise<CartMutationResponse>`
 
@@ -177,6 +240,12 @@ Removes a custom field from the cart.
 ```ts
 await cart.deleteField(cartId, 'giftMessage')
 ```
+
+**Parameters:**
+
+| Field | Type     | Description                  |
+| ----- | -------- | ---------------------------- |
+| `key` | `string` | Custom field key to remove   |
 
 **Returns:** `Promise<CartMutationResponse>`
 
@@ -288,26 +357,52 @@ interface Address {
 }
 ```
 
-### `CartError`
+### `SetQuantityRequest`
 
 ```ts
-interface CartError {
-  error: {
-    code: string
-    message: string
-  }
+interface SetQuantityRequest {
+  cartItemId: string
+  quantity: number
 }
 ```
 
-### `isCartError(response)`
-
-Type guard to check if a response is a `CartError`.
+### `SetFieldRequest`
 
 ```ts
-import { isCartError } from '@hantera/storefront-sdk/cart'
+interface SetFieldRequest {
+  value: unknown
+}
+```
 
-const result = await cart.getCart(cartId)
-if (isCartError(result)) {
-  // result is CartError
+### `CartErrors`
+
+Represents an error response from the Hantera API. The runtime wraps ingress errors into this shape automatically.
+
+```ts
+interface CartErrors {
+  errors: CartErrorItem[]
+}
+```
+
+### `CartErrorItem`
+
+```ts
+interface CartErrorItem {
+  code: string
+  message: string
+  details?: Record<string, unknown>
+}
+```
+
+### `isCartErrors(response)`
+
+Type guard to check if a response is a `CartErrors`.
+
+```ts
+import { isCartErrors } from '@hantera/storefront-sdk/cart'
+
+const result = await cart.addItem(cartId, { productNumber: 'PROD-001', quantity: 2 })
+if (isCartErrors(result)) {
+  result.errors.forEach((e) => console.error(e.code, e.message))
 }
 ```
