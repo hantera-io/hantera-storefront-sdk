@@ -89,8 +89,10 @@ yarn docs:dev
 yarn docs:build
 ```
 
-The docs site builds to `docs/.vitepress/dist/` and can be deployed as a static site on Cloudflare Pages.
+The docs site builds to `docs/.vitepress/dist/` and can be deployed as a static site.
 
 ## License
 
-Proprietary — Hantera AB
+Apache 2.0
+
+Copyright 2026 Hantera AB
