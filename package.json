@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "docs"
+  ],
+  "scripts": {
+    "dev": "yarn workspace docs dev",
+    "build:sdk": "yarn workspace @hantera/storefront-sdk build",
+    "build:docs": "yarn workspace docs build",
+    "build": "yarn build:sdk && yarn build:docs"
+  },
+  "packageManager": "yarn@4.4.1"
+}
