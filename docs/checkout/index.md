@@ -8,34 +8,14 @@ This documentation includes Vue-based sample implementations in the [Cart Playgr
 
 ## How Checkout Works
 
-Checkout in Hantera follows a consistent pattern regardless of which payment provider you use:
+While the general flow is similar across providers, each checkout integration has its own API, client-side requirements, and response format. Refer to the individual integration guides below for specifics.
+
+The high-level pattern is:
 
 1. **Create a cart** and add items to it
-2. **Set customer information** — email, phone, addresses
-3. **Submit payment** via `submitPayment(cartId, paymentType, body)`
-4. **Handle the PSP response** — redirect, confirm, or wait
-5. **Cart completes** asynchronously once the server confirms payment
-
-```ts
-import { createCartClient } from '@hantera/storefront-sdk/cart'
-
-const cart = createCartClient({ baseUrl: 'https://core.your-instance.hantera.cloud' })
-
-// Step 3: Submit payment — response depends on the PSP
-const result = await cart.submitPayment(cartId, 'stripe', {})
-```
-
-## The `submitPayment` Convention
-
-Payment provider apps in Hantera register an ingress at:
-
-```
-/ingress/commerce/carts/{cartId}/payment/{paymentType}
-```
-
-The SDK's `submitPayment` method calls this endpoint. The request body and response format are defined by the PSP app — the SDK simply passes them through.
-
-For example, the Stripe app returns `{ clientSecret }` which you use with Stripe.js to confirm the payment on the client side.
+2. **Set customer information** — email, phone, address
+3. **Initiate checkout** using the payment provider's integration
+4. **Cart completes** asynchronously once the server confirms payment
 
 ## Completion Flow
 
@@ -64,10 +44,12 @@ After a payment redirect (e.g., from Stripe), reconnect to SSE and show a loadin
 | [Stripe](/checkout/stripe) | `stripe` | `stripe` PSP app | Card payments with Stripe Elements |
 | [Stripe Express](/checkout/stripe-express) | `stripe` | `stripe` PSP app | Apple Pay, Google Pay, Link |
 | [Demo](/checkout/demo) | `demo` | `demo-retail` app | Simulated payment for testing |
+| [Kustom (KCO)](/checkout/kustom) | `kustom` | `kustom` PSP app | Iframe checkout with address, shipping & payment |
 
 ## Prerequisites
 
 Each checkout method requires the corresponding Hantera app to be installed and configured on your instance:
 
 - **Stripe / Stripe Express** — Install the `stripe` PSP app and configure your Stripe API keys
+- **Kustom** — Install the `kustom` PSP app and configure your Kustom API credentials
 - **Demo** — Install the `demo-retail` app which includes a simulated payment handler

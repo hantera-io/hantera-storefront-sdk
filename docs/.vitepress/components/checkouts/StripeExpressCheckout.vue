@@ -86,7 +86,7 @@ function initElements() {
     }
 
     if (event.shippingAddress) {
-      addressRequest.deliveryAddress = {
+      addressRequest.address = {
         name: event.shippingAddress.name,
         addressLine1: event.shippingAddress.address.line1,
         addressLine2: event.shippingAddress.address.line2,
@@ -110,9 +110,14 @@ function initElements() {
     }
 
     try {
-      const res = await props.client.submitPayment(props.cartId, 'stripe', {}) as any
-      if (!res || res.error) {
-        errorMessage.value = res?.error?.message ?? 'Failed to create payment'
+      const res = await fetch(`${props.baseUrl}/ingress/commerce/carts/${props.cartId}/payment/stripe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (!data || data.error) {
+        errorMessage.value = data?.error?.message ?? 'Failed to create payment'
         return
       }
 
@@ -123,7 +128,7 @@ function initElements() {
 
       const { error } = await stripe.confirmPayment({
         elements,
-        clientSecret: res.clientSecret,
+        clientSecret: data.clientSecret,
         confirmParams: {
           return_url: returnUrl.toString(),
         },

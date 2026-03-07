@@ -7,21 +7,28 @@ const methods = [
   {
     id: 'stripe',
     title: 'Stripe',
-    image: '/stripe.png',
+    image: '/stripe.svg',
     description: 'Card payments with Stripe Elements. Includes address forms and multiple payment methods.',
     requirement: 'Requires the Stripe PSP app to be installed.',
   },
   {
     id: 'stripe-express',
     title: 'Stripe Express',
-    image: '/stripe.png',
+    image: '/stripe.svg',
     description: 'One-click checkout with Apple Pay, Google Pay, and Link via Stripe Express Checkout.',
     requirement: 'Requires the Stripe PSP app to be installed.',
   },
   {
+    id: 'kustom',
+    title: 'Kustom',
+    image: '/kustom.svg',
+    description: 'Full checkout experience powered by Kustom (Klarna Checkout). Includes address, shipping, and payment in an iframe.',
+    requirement: 'Requires the Kustom PSP app to be installed.',
+  },
+  {
     id: 'demo',
     title: 'Demo',
-    image: '/hantera.png',
+    image: '/hantera.svg',
     description: 'Simulated payment for testing. Completes the cart without a real payment provider.',
     requirement: 'Requires the demo-retail app to be installed.',
   },
@@ -137,11 +144,5 @@ const methods = [
   color: var(--vp-c-text-3);
   font-style: italic;
   margin-top: 0.25rem;
-}
-</style>
-
-<style>
-html:not(.dark) .card-icon-img {
-  filter: invert(1);
 }
 </style>

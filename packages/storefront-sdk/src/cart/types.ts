@@ -47,10 +47,12 @@ export interface Cart {
   cartNumber: string
   orderNumber: string
   cartState: string
+  profileKey?: string
   channelKey: string
   currencyCode: string
+  locale?: string
   customer?: Record<string, unknown>
-  deliveryAddress?: Address
+  address?: Address
   invoiceAddress?: Address
   items: CartItem[]
   fields?: Record<string, unknown>
@@ -74,8 +76,8 @@ export interface CartErrors {
 export type CartMutationResponse = Cart | CartErrors
 
 export interface CreateCartRequest {
-  currencyCode: string
-  channelKey: string
+  profileKey: string
+  locale: string
 }
 
 export interface CreateCartResponse {
@@ -92,7 +94,7 @@ export interface RemoveItemRequest {
 }
 
 export interface SetAddressRequest {
-  deliveryAddress?: Address | 'unset'
+  address?: Address
   invoiceAddress?: Address | 'unset'
 }
 

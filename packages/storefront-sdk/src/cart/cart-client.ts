@@ -22,6 +22,10 @@ export class CartClient {
     this.http = new HttpClient(options)
   }
 
+  async getCartProfiles(): Promise<string[]> {
+    return this.http.request<string[]>('GET', '/ingress/commerce/cart-profiles')
+  }
+
   async createCart(request: CreateCartRequest): Promise<CreateCartResponse> {
     return this.http.request<CreateCartResponse>('POST', '/ingress/commerce/carts', request)
   }
@@ -106,14 +110,6 @@ export class CartClient {
     return this.http.request<CartMutationResponse>(
       'POST',
       `/ingress/commerce/carts/${cartId}/remove-field/${encodeURIComponent(key)}`,
-    )
-  }
-
-  async submitPayment(cartId: string, paymentType: string, body: unknown): Promise<unknown> {
-    return this.http.request<unknown>(
-      'POST',
-      `/ingress/commerce/carts/${cartId}/payment/${paymentType}`,
-      body,
     )
   }
 

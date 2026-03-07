@@ -20,12 +20,12 @@ const errorMessage = ref<string | null>(null)
 const email = ref(props.cart.email ?? '')
 
 const address = ref({
-  name: props.cart.deliveryAddress?.name ?? '',
-  addressLine1: props.cart.deliveryAddress?.addressLine1 ?? '',
-  addressLine2: props.cart.deliveryAddress?.addressLine2 ?? '',
-  postalCode: props.cart.deliveryAddress?.postalCode ?? '',
-  city: props.cart.deliveryAddress?.city ?? '',
-  countryCode: props.cart.deliveryAddress?.countryCode ?? 'SE',
+  name: props.cart.address?.name ?? '',
+  addressLine1: props.cart.address?.addressLine1 ?? '',
+  addressLine2: props.cart.address?.addressLine2 ?? '',
+  postalCode: props.cart.address?.postalCode ?? '',
+  city: props.cart.address?.city ?? '',
+  countryCode: props.cart.address?.countryCode ?? 'SE',
 })
 
 async function handleSubmit() {
@@ -41,7 +41,7 @@ async function handleSubmit() {
 
     if (address.value.name || address.value.addressLine1) {
       await props.client.setAddress(props.cartId, {
-        deliveryAddress: {
+        address: {
           name: address.value.name || undefined,
           addressLine1: address.value.addressLine1 || undefined,
           addressLine2: address.value.addressLine2 || undefined,
@@ -52,9 +52,14 @@ async function handleSubmit() {
       })
     }
 
-    const res = await props.client.submitPayment(props.cartId, 'demo', {}) as any
-    if (res?.error) {
-      errorMessage.value = res.error.message ?? 'Payment submission failed'
+    const res = await fetch(`${props.baseUrl}/ingress/commerce/carts/${props.cartId}/payment/demo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const data = await res.json()
+    if (data?.error) {
+      errorMessage.value = data.error.message ?? 'Payment submission failed'
       submitting.value = false
       return
     }
