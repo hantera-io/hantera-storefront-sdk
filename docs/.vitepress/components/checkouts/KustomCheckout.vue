@@ -22,13 +22,16 @@ const loading = ref(true)
 const errorMessage = ref<string | null>(null)
 const kustomContainer = ref<HTMLElement | null>(null)
 
-const kustomDirty = computed(() => props.cart?.fields?.kustomDirty === true)
+const kustomSyncing = computed(() => {
+  const pending = props.cart?.fields?.kustomPendingHash
+  const synced = props.cart?.fields?.kustomSyncHash
+  return pending != null && pending !== synced
+})
 
-watch(kustomDirty, (dirty) => {
-  if (dirty) {
-    (window as any)._klarnaCheckout?.suspend()
-  } else {
-    (window as any)._klarnaCheckout?.resume()
+watch(kustomSyncing, (syncing) => {
+  const kco = (window as any)._klarnaCheckout
+  if (typeof kco === 'function') {
+    kco((api: any) => syncing ? api.suspend() : api.resume())
   }
 })
 
@@ -40,6 +43,15 @@ watch(
     }
   },
 )
+
+function waitForKcoAndSuspend(retries = 10) {
+  const kco = (window as any)._klarnaCheckout
+  if (typeof kco === 'function') {
+    kco((api: any) => api.suspend())
+  } else if (retries > 0) {
+    setTimeout(() => waitForKcoAndSuspend(retries - 1), 200)
+  }
+}
 
 onMounted(async () => {
   try {
@@ -75,6 +87,11 @@ onMounted(async () => {
 
     loading.value = false
     renderSnippet(data.htmlSnippet)
+
+    // If a sync is already pending when the checkout loads, suspend once KCO is ready
+    if (kustomSyncing.value) {
+      waitForKcoAndSuspend()
+    }
   } catch (e: any) {
     errorMessage.value = e.message
     loading.value = false
@@ -103,9 +120,9 @@ function renderSnippet(htmlSnippet: string) {
     <div v-if="loading" class="loading-state">Loading Kustom Checkout...</div>
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
-    <div v-if="kustomDirty" class="sync-banner">Updating order… Please wait.</div>
+    <div v-if="kustomSyncing" class="sync-banner">Updating order… Please wait.</div>
 
-    <div ref="kustomContainer" v-show="!loading && !errorMessage"></div>
+    <div ref="kustomContainer"></div>
   </div>
 </template>
 

@@ -36,11 +36,11 @@ When the storefront calls the Kustom checkout ingress, the server:
 
 If the customer modifies the cart after the Kustom iframe is loaded (e.g., changes quantity), the system:
 
-1. Detects the change via a rule (`OnTicketCommands`)
-2. Schedules a background job to sync the updated cart to Kustom
-3. Sets a `kustomDirty` flag on the cart
-4. The storefront sees `kustomDirty` via SSE and suspends the iframe
-5. After sync completes, the flag is cleared and the iframe resumes
+1. Detects the change via the `OnCartMutation` hook (fired by Commerce on every cart mutation)
+2. Computes a hash of the Kustom payload and compares it to the stored `kustomSyncHash`
+3. If the hash differs, sets `kustomPendingHash` on the cart and schedules a background sync job
+4. The storefront detects mismatched hashes via SSE and suspends the iframe
+5. After sync completes, `kustomSyncHash` is updated to match, and the iframe resumes
 
 ### Payment Completion
 
@@ -107,25 +107,29 @@ Setting `innerHTML` does not execute `<script>` tags. You must clone and replace
 
 ## Step 3: Handle Cart Changes
 
-Monitor the `kustomDirty` field via SSE and suspend/resume the Kustom iframe accordingly:
+Monitor the cart's sync hashes via SSE and suspend/resume the Kustom iframe when a sync is in progress. The cart has two hash fields: `kustomPendingHash` (set when a sync is needed) and `kustomSyncHash` (set when the sync completes). When they differ, the Kustom order is being updated.
 
 ```ts
 import { createCartClient } from '@hantera/storefront-sdk/cart'
 
 const client = createCartClient({ baseUrl })
 
+function isKustomSyncing(cart) {
+  const pending = cart.fields?.kustomPendingHash
+  const synced = cart.fields?.kustomSyncHash
+  return pending != null && pending !== synced
+}
+
 const eventSource = client.subscribeToCartEvents(cartId, {
   onUpdate: (cart) => {
-    if (cart.fields?.kustomDirty) {
-      window._klarnaCheckout?.suspend()
-    } else {
-      window._klarnaCheckout?.resume()
-    }
+    window._klarnaCheckout?.((api) => {
+      isKustomSyncing(cart) ? api.suspend() : api.resume()
+    })
   },
 })
 ```
 
-The `_klarnaCheckout` global is injected by the Kustom iframe script and provides `suspend()` and `resume()` methods.
+The `_klarnaCheckout` global is injected by the Kustom iframe script. It's a callback function — call it with a function that receives the `api` object with `suspend()` and `resume()` methods.
 
 ## Step 4: Handle Completion
 
@@ -181,13 +185,17 @@ container.querySelectorAll('script').forEach((old) => {
 })
 
 // 3. Listen for cart changes and completion
+function isKustomSyncing(cart) {
+  const pending = cart.fields?.kustomPendingHash
+  const synced = cart.fields?.kustomSyncHash
+  return pending != null && pending !== synced
+}
+
 const eventSource = client.subscribeToCartEvents(cartId, {
   onUpdate: (cart) => {
-    if (cart.fields?.kustomDirty) {
-      window._klarnaCheckout?.suspend()
-    } else {
-      window._klarnaCheckout?.resume()
-    }
+    window._klarnaCheckout?.((api) => {
+      isKustomSyncing(cart) ? api.suspend() : api.resume()
+    })
 
     if (cart.cartState === 'completed') {
       eventSource.close()

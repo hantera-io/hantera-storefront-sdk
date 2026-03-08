@@ -53,8 +53,8 @@ export default defineConfig({
           { text: 'Overview', link: '/checkout/' },
           { text: 'Stripe', link: '/checkout/stripe' },
           { text: 'Stripe Express', link: '/checkout/stripe-express' },
-          { text: 'Demo', link: '/checkout/demo' },
           { text: 'Kustom (KCO)', link: '/checkout/kustom' },
+          { text: 'Demo', link: '/checkout/demo' },
         ],
       },
       {
