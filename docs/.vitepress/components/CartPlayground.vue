@@ -310,6 +310,7 @@ function goBack() {
   checkoutView.value = 'select'
   completing.value = false
   unsubscribe()
+  loadCartProfiles()
 }
 
 function handleCheckoutSelect(method: string) {
@@ -335,32 +336,24 @@ function formatDate(d: string): string {
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search)
-  const redirectStatus = params.get('redirect_status')
   const cartId = params.get('cart')
+  const checkout = params.get('checkout') as CheckoutView | null
 
-  if (redirectStatus && cartId) {
-    const url = new URL(window.location.href)
-    url.searchParams.delete('payment_intent')
-    url.searchParams.delete('payment_intent_client_secret')
-    url.searchParams.delete('redirect_status')
-    url.searchParams.delete('cart')
-    window.history.replaceState({}, '', url.toString())
-
+  if (cartId) {
     const knownCart = storedCarts.value.find((c) => c.cartId === cartId)
-    if (!knownCart) return
-
-    if (redirectStatus === 'failed') {
-      selectCart(cartId)
-      error.value = 'Payment failed. Please try again.'
+    if (!knownCart) {
+      loadCartProfiles()
       return
     }
 
     currentCartId.value = cartId
-    completing.value = true
     resetStripeLoader()
     subscribeToEvents(cartId)
-  }
-  else {
+
+    if (checkout && checkout !== 'select') {
+      checkoutView.value = checkout
+    }
+  } else {
     loadCartProfiles()
   }
 })

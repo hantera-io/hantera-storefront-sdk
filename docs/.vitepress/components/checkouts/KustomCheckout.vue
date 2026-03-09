@@ -19,6 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const loading = ref(true)
+const confirming = ref(false)
 const errorMessage = ref<string | null>(null)
 const kustomContainer = ref<HTMLElement | null>(null)
 
@@ -53,7 +54,65 @@ function waitForKcoAndSuspend(retries = 10) {
   }
 }
 
+function isRedirectCallback(): boolean {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('redirect_status') === 'succeeded' && params.get('checkout') === 'kustom'
+}
+
+function cleanRedirectParams() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('redirect_status')
+  url.searchParams.delete('cart')
+  url.searchParams.delete('checkout')
+  window.history.replaceState({}, '', url.toString())
+}
+
+async function confirmWithKustom(attempt = 1): Promise<void> {
+  const maxAttempts = 5
+  const backoffMs = [0, 1000, 2000, 4000, 8000]
+
+  try {
+    const res = await fetch(
+      `${props.baseUrl}/ingress/commerce/carts/${props.cartId}/payment/kustom/confirm`,
+      { method: 'POST' },
+    )
+    const data = await res.json()
+
+    if (data?.error) {
+      errorMessage.value = data.error.message ?? 'Failed to confirm payment'
+      confirming.value = false
+      return
+    }
+
+    if (data?.status === 'checkout_complete') {
+      return
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, backoffMs[attempt] ?? 4000))
+      return confirmWithKustom(attempt + 1)
+    }
+
+    confirming.value = false
+  } catch (e: any) {
+    if (attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, backoffMs[attempt] ?? 4000))
+      return confirmWithKustom(attempt + 1)
+    }
+    errorMessage.value = e.message
+    confirming.value = false
+  }
+}
+
 onMounted(async () => {
+  if (isRedirectCallback()) {
+    cleanRedirectParams()
+    confirming.value = true
+    loading.value = false
+    confirmWithKustom()
+    return
+  }
+
   try {
     const origin = window.location.origin.replace('http://', 'https://')
     const playgroundPath = window.location.pathname
@@ -67,7 +126,7 @@ onMounted(async () => {
           checkoutUrl: props.checkoutUrl ?? `${origin}${playgroundPath}?cart=${props.cartId}`,
           confirmationUrl:
             props.confirmationUrl ??
-            `${origin}${playgroundPath}?redirect_status=succeeded&cart=${props.cartId}`,
+            `${origin}${playgroundPath}?redirect_status=succeeded&cart=${props.cartId}&checkout=kustom`,
         }),
       },
     )
@@ -88,7 +147,6 @@ onMounted(async () => {
     loading.value = false
     renderSnippet(data.htmlSnippet)
 
-    // If a sync is already pending when the checkout loads, suspend once KCO is ready
     if (kustomSyncing.value) {
       waitForKcoAndSuspend()
     }
@@ -118,6 +176,7 @@ function renderSnippet(htmlSnippet: string) {
     <button class="btn-back" @click="$emit('back')">← Back to options</button>
 
     <div v-if="loading" class="loading-state">Loading Kustom Checkout...</div>
+    <div v-if="confirming" class="confirming-state">Confirming your payment…</div>
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
     <div v-if="kustomSyncing" class="sync-banner">Updating order… Please wait.</div>
@@ -144,7 +203,8 @@ function renderSnippet(htmlSnippet: string) {
   cursor: pointer;
 }
 
-.loading-state {
+.loading-state,
+.confirming-state {
   text-align: center;
   padding: 2rem;
   color: var(--vp-c-text-2);

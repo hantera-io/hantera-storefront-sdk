@@ -19,7 +19,7 @@ Unlike Stripe where the storefront controls the payment form, Kustom provides a 
 1. **Initialize checkout** — POST to the Kustom payment ingress, receive an HTML snippet
 2. **Render the iframe** — inject the snippet into the DOM
 3. **Handle cart changes** — suspend/resume the iframe when the cart is syncing
-4. **Completion** — Kustom calls a webhook on your server, the cart completes via SSE
+4. **Completion** — Kustom redirects to the confirmation URL; the frontend calls the confirm ingress to finalize the order immediately
 
 ## How It Works
 
@@ -46,9 +46,15 @@ If the customer modifies the cart after the Kustom iframe is loaded (e.g., chang
 
 When the customer completes payment in the Kustom iframe:
 
-1. Kustom sends a push notification to the webhook ingress
-2. The webhook fetches the order from Kustom and creates a Payment in Hantera
-3. The cart is completed, and the storefront detects this via SSE
+1. Kustom redirects the browser to the `confirmationUrl` with query parameters
+2. The frontend detects the redirect and calls the **confirm ingress** (`POST /ingress/commerce/carts/{cartId}/payment/kustom/confirm`)
+3. The confirm ingress fetches the Kustom order, and if its status is `checkout_complete`:
+   - Creates a Payment with authorization in Hantera
+   - Links the payment to the cart and completes it
+   - Sends an acknowledgement to Kustom (`POST /ordermanagement/v1/orders/{id}/acknowledge`)
+4. The cart completion triggers an SSE update, and the storefront shows the confirmation page
+
+Kustom also sends an asynchronous push notification (typically 2–5 minutes later) to the push notification webhook. The webhook acts as a fallback: if the cart is already completed, it simply acknowledges to Kustom and returns. If the browser-initiated confirm didn't happen (e.g., browser closed), the webhook completes the cart instead.
 
 ## Step 1: Initialize Checkout
 
@@ -64,7 +70,7 @@ const response = await fetch(
     body: JSON.stringify({
       termsUrl: `${origin}/terms`,
       checkoutUrl: `${origin}/checkout`,
-      confirmationUrl: `${origin}/confirmation`,
+      confirmationUrl: `${origin}/confirmation?redirect_status=succeeded&cart=${cartId}`,
     }),
   },
 )
@@ -77,7 +83,7 @@ The merchant URLs tell Kustom where to send the customer:
 |---|---|
 | `termsUrl` | Link to your terms & conditions page |
 | `checkoutUrl` | URL of the checkout page (used if the customer navigates back) |
-| `confirmationUrl` | Where to redirect the customer after successful payment |
+| `confirmationUrl` | Where to redirect the customer after successful payment. Include query params so the frontend can detect the redirect and trigger confirmation. |
 
 The push (webhook) URL is constructed automatically on the server from the system registry.
 
@@ -131,9 +137,43 @@ const eventSource = client.subscribeToCartEvents(cartId, {
 
 The `_klarnaCheckout` global is injected by the Kustom iframe script. It's a callback function — call it with a function that receives the `api` object with `suspend()` and `resume()` methods.
 
-## Step 4: Handle Completion
+## Step 4: Handle Completion via Confirm Ingress
 
-Cart completion happens server-side when Kustom sends a push notification. Listen for the `completed` state via SSE:
+When Kustom redirects the browser to the `confirmationUrl`, detect the redirect and call the confirm ingress. The confirm ingress reads the `kustomOrderId` from the cart, fetches the order from Kustom, and if the status is `checkout_complete`, creates the payment and completes the cart.
+
+```ts
+function isRedirectCallback(cartId: string): boolean {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('redirect_status') === 'succeeded' && params.get('cart') === cartId
+}
+
+async function confirmWithKustom(baseUrl: string, cartId: string, attempt = 1) {
+  const maxAttempts = 5
+  const backoffMs = [0, 1000, 2000, 4000, 8000]
+
+  const res = await fetch(`${baseUrl}/ingress/commerce/carts/${cartId}/payment/kustom/confirm`, { method: 'POST' })
+  const data = await res.json()
+
+  if (data?.status === 'checkout_complete') {
+    // Cart is now completed — SSE will fire the update
+    return
+  }
+
+  // Kustom hasn't finalized yet; retry with backoff
+  if (attempt < maxAttempts) {
+    await new Promise((r) => setTimeout(r, backoffMs[attempt] ?? 4000))
+    return confirmWithKustom(baseUrl, cartId, attempt + 1)
+  }
+}
+```
+
+The confirm ingress returns `{ status: "<kustom_order_status>" }`. When the status is `checkout_complete`, the server has already created the payment, completed the cart, and acknowledged to Kustom. The frontend then detects the `completed` cart state via SSE.
+
+::: tip Retry with Backoff
+In rare cases, Kustom may redirect the browser before the order status is fully `checkout_complete` on their end. The retry logic handles this by polling the confirm ingress with exponential backoff.
+:::
+
+Also listen for the `completed` state via SSE as the primary trigger for showing the confirmation page:
 
 ```ts
 const eventSource = client.subscribeToCartEvents(cartId, {
@@ -146,9 +186,9 @@ const eventSource = client.subscribeToCartEvents(cartId, {
 })
 ```
 
-::: warning Async Completion
-The Kustom iframe may show a "thank you" page before the server has finished processing. Always use SSE to detect the actual `completed` state before showing your own confirmation page.
-:::
+### Push Webhook Fallback
+
+The push webhook (`POST /ingress/kustom/webhook/push`) still operates as a safety net. If the browser-based confirm didn't run (browser closed, network issue, etc.), the push notification from Kustom will complete the cart. If the cart is already completed by the time the push arrives, the webhook simply acknowledges to Kustom and returns OK.
 
 ## Complete Example
 
@@ -158,31 +198,42 @@ import { createCartClient } from '@hantera/storefront-sdk/cart'
 const baseUrl = 'https://core.your-instance.hantera.cloud'
 const client = createCartClient({ baseUrl })
 
-// 1. Initialize checkout
-const origin = window.location.origin
-const response = await fetch(
-  `${baseUrl}/ingress/commerce/carts/${cartId}/payment/kustom`,
-  {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      termsUrl: `${origin}/terms`,
-      checkoutUrl: `${origin}/checkout`,
-      confirmationUrl: `${origin}/confirmation`,
-    }),
-  },
-)
-const { htmlSnippet } = await response.json()
+// Check if this is a redirect callback from Kustom
+function isRedirectCallback(): boolean {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('redirect_status') === 'succeeded' && params.get('cart') === cartId
+}
 
-// 2. Render iframe
-const container = document.getElementById('kustom-checkout')!
-container.innerHTML = htmlSnippet
-container.querySelectorAll('script').forEach((old) => {
-  const s = document.createElement('script')
-  Array.from(old.attributes).forEach((a) => s.setAttribute(a.name, a.value))
-  s.textContent = old.textContent
-  old.parentNode?.replaceChild(s, old)
-})
+if (isRedirectCallback()) {
+  // Confirm payment immediately via the confirm ingress
+  confirmWithKustom(baseUrl, cartId)
+} else {
+  // 1. Initialize checkout
+  const origin = window.location.origin
+  const response = await fetch(
+    `${baseUrl}/ingress/commerce/carts/${cartId}/payment/kustom`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        termsUrl: `${origin}/terms`,
+        checkoutUrl: `${origin}/checkout`,
+        confirmationUrl: `${origin}/confirmation?redirect_status=succeeded&cart=${cartId}`,
+      }),
+    },
+  )
+  const { htmlSnippet } = await response.json()
+
+  // 2. Render iframe
+  const container = document.getElementById('kustom-checkout')!
+  container.innerHTML = htmlSnippet
+  container.querySelectorAll('script').forEach((old) => {
+    const s = document.createElement('script')
+    Array.from(old.attributes).forEach((a) => s.setAttribute(a.name, a.value))
+    s.textContent = old.textContent
+    old.parentNode?.replaceChild(s, old)
+  })
+}
 
 // 3. Listen for cart changes and completion
 function isKustomSyncing(cart) {
@@ -203,4 +254,27 @@ const eventSource = client.subscribeToCartEvents(cartId, {
     }
   },
 })
+
+// Confirm helper with retry
+async function confirmWithKustom(baseUrl: string, cartId: string, attempt = 1) {
+  const maxAttempts = 5
+  const backoffMs = [0, 1000, 2000, 4000, 8000]
+
+  try {
+    const res = await fetch(`${baseUrl}/ingress/commerce/carts/${cartId}/payment/kustom/confirm`, { method: 'POST' })
+    const data = await res.json()
+
+    if (data?.status === 'checkout_complete') return
+
+    if (attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, backoffMs[attempt] ?? 4000))
+      return confirmWithKustom(baseUrl, cartId, attempt + 1)
+    }
+  } catch {
+    if (attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, backoffMs[attempt] ?? 4000))
+      return confirmWithKustom(baseUrl, cartId, attempt + 1)
+    }
+  }
+}
 ```

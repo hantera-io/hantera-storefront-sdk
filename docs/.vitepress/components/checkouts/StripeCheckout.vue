@@ -26,7 +26,38 @@ const { isDark, appearance, watchThemeChanges } = useStripeAppearance()
 
 let elements: any
 
+function isRedirectCallback(): boolean {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('checkout') === 'stripe' && params.has('redirect_status')
+}
+
+function cleanRedirectParams() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('payment_intent')
+  url.searchParams.delete('payment_intent_client_secret')
+  url.searchParams.delete('redirect_status')
+  url.searchParams.delete('cart')
+  url.searchParams.delete('checkout')
+  window.history.replaceState({}, '', url.toString())
+}
+
 onMounted(async () => {
+  if (isRedirectCallback()) {
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('redirect_status')
+    cleanRedirectParams()
+
+    if (status === 'failed') {
+      errorMessage.value = 'Payment failed. Please try again.'
+      loading.value = false
+      return
+    }
+
+    loading.value = false
+    emit('completing')
+    return
+  }
+
   try {
     const publicKey = await fetchStripePublicKey(props.baseUrl)
     stripe.value = await loadStripe(publicKey)
@@ -191,6 +222,7 @@ async function handleSubmit() {
 
     const returnUrl = new URL(window.location.href)
     returnUrl.searchParams.set('cart', props.cartId)
+    returnUrl.searchParams.set('checkout', 'stripe')
 
     const { error } = await stripe.value.confirmPayment({
       elements,
