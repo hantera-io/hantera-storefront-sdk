@@ -26,7 +26,38 @@ const { isDark, appearance, watchThemeChanges } = useStripeAppearance()
 
 let elements: any
 
+function isRedirectCallback(): boolean {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('checkout') === 'stripe' && params.has('redirect_status')
+}
+
+function cleanRedirectParams() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('payment_intent')
+  url.searchParams.delete('payment_intent_client_secret')
+  url.searchParams.delete('redirect_status')
+  url.searchParams.delete('cart')
+  url.searchParams.delete('checkout')
+  window.history.replaceState({}, '', url.toString())
+}
+
 onMounted(async () => {
+  if (isRedirectCallback()) {
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('redirect_status')
+    cleanRedirectParams()
+
+    if (status === 'failed') {
+      errorMessage.value = 'Payment failed. Please try again.'
+      loading.value = false
+      return
+    }
+
+    loading.value = false
+    emit('completing')
+    return
+  }
+
   try {
     const publicKey = await fetchStripePublicKey(props.baseUrl)
     stripe.value = await loadStripe(publicKey)
@@ -82,16 +113,16 @@ function initElements() {
   const deliveryEl = elements.create('address', {
     ...commonAddressOptions,
     mode: 'shipping',
-    defaultValues: props.cart.deliveryAddress
+    defaultValues: props.cart.address
       ? {
-          name: props.cart.deliveryAddress.name,
+          name: props.cart.address.name,
           address: {
-            line1: props.cart.deliveryAddress.addressLine1,
-            line2: props.cart.deliveryAddress.addressLine2,
-            city: props.cart.deliveryAddress.city,
-            state: props.cart.deliveryAddress.state,
-            postal_code: props.cart.deliveryAddress.postalCode,
-            country: props.cart.deliveryAddress.countryCode,
+            line1: props.cart.address.addressLine1,
+            line2: props.cart.address.addressLine2,
+            city: props.cart.address.city,
+            state: props.cart.address.state,
+            postal_code: props.cart.address.postalCode,
+            country: props.cart.address.countryCode,
           },
         }
       : undefined,
@@ -102,7 +133,7 @@ function initElements() {
     if (event.complete) {
       const addr = event.value.address
       props.client.setAddress(props.cartId, {
-        deliveryAddress: {
+        address: {
           name: event.value.name,
           addressLine1: addr.line1,
           addressLine2: addr.line2,
@@ -175,17 +206,23 @@ async function handleSubmit() {
   }
 
   try {
-    const res = await props.client.submitPayment(props.cartId, 'stripe', {}) as any
-    if (!res || res.error) {
-      errorMessage.value = res?.error?.message ?? 'Failed to create payment'
+    const res = await fetch(`${props.baseUrl}/ingress/commerce/carts/${props.cartId}/payment/stripe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const data = await res.json()
+    if (!data || data.error) {
+      errorMessage.value = data?.error?.message ?? 'Failed to create payment'
       submitting.value = false
       return
     }
 
-    const { clientSecret } = res
+    const { clientSecret } = data
 
     const returnUrl = new URL(window.location.href)
     returnUrl.searchParams.set('cart', props.cartId)
+    returnUrl.searchParams.set('checkout', 'stripe')
 
     const { error } = await stripe.value.confirmPayment({
       elements,

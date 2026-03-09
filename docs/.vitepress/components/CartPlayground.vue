@@ -7,6 +7,7 @@ import CheckoutSelector from './checkouts/CheckoutSelector.vue'
 import StripeCheckout from './checkouts/StripeCheckout.vue'
 import StripeExpressCheckout from './checkouts/StripeExpressCheckout.vue'
 import DemoCheckout from './checkouts/DemoCheckout.vue'
+import KustomCheckout from './checkouts/KustomCheckout.vue'
 import OrderConfirmation from './checkouts/OrderConfirmation.vue'
 import { resetStripeLoader } from './checkouts/stripe-loader'
 
@@ -16,13 +17,12 @@ const STORAGE_KEY_CARTS = 'hantera-sdk-playground-carts'
 interface StoredCart {
   cartId: string
   tenant: string
-  channelKey: string
-  currencyCode: string
+  profileKey: string
   createdAt: string
   completedAt?: string
 }
 
-type CheckoutView = 'select' | 'stripe' | 'stripe-express' | 'demo'
+type CheckoutView = 'select' | 'stripe' | 'stripe-express' | 'demo' | 'kustom'
 
 const tenant = ref(loadTenant())
 const storedCarts = ref<StoredCart[]>(loadCarts())
@@ -32,8 +32,10 @@ const loading = ref(false)
 const syncing = ref(false)
 const completing = ref(false)
 const error = ref<string | null>(null)
-const currencyCode = ref('SEK')
-const channelKey = ref('retail_SE')
+const profileKey = ref('')
+const availableProfiles = ref<string[]>([])
+const locale = ref('sv_SE')
+const loadingProfiles = ref(false)
 const productNumber = ref('')
 const quantity = ref(1)
 const couponCode = ref('')
@@ -89,6 +91,25 @@ function loadCarts(): StoredCart[] {
 
 function saveConfig() {
   localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({ tenant: tenant.value }))
+  loadCartProfiles()
+}
+
+async function loadCartProfiles() {
+  if (!tenant.value.trim()) {
+    availableProfiles.value = []
+    return
+  }
+  loadingProfiles.value = true
+  try {
+    availableProfiles.value = await client.value.getCartProfiles()
+    if (availableProfiles.value.length > 0 && !profileKey.value) {
+      profileKey.value = availableProfiles.value[0]
+    }
+  } catch {
+    availableProfiles.value = []
+  } finally {
+    loadingProfiles.value = false
+  }
 }
 
 function saveCarts() {
@@ -104,8 +125,8 @@ async function createCart() {
   error.value = null
   try {
     const response = await client.value.createCart({
-      currencyCode: currencyCode.value,
-      channelKey: channelKey.value,
+      profileKey: profileKey.value,
+      locale: locale.value,
     })
     if (isCartErrors(response)) {
       handleErrors(response)
@@ -114,8 +135,7 @@ async function createCart() {
     const newCart: StoredCart = {
       cartId: response.cartId,
       tenant: tenant.value.trim(),
-      channelKey: channelKey.value,
-      currencyCode: currencyCode.value,
+      profileKey: profileKey.value,
       createdAt: new Date().toISOString(),
     }
     storedCarts.value.push(newCart)
@@ -290,6 +310,7 @@ function goBack() {
   checkoutView.value = 'select'
   completing.value = false
   unsubscribe()
+  loadCartProfiles()
 }
 
 function handleCheckoutSelect(method: string) {
@@ -305,7 +326,7 @@ function handleCheckoutBack() {
 }
 
 function formatCurrency(amount: number): string {
-  const cc = currentStoredCart.value?.currencyCode ?? 'SEK'
+  const cc = cart.value?.currencyCode ?? 'SEK'
   return new Intl.NumberFormat('sv-SE', { style: 'currency', currency: cc }).format(amount)
 }
 
@@ -315,30 +336,25 @@ function formatDate(d: string): string {
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search)
-  const redirectStatus = params.get('redirect_status')
   const cartId = params.get('cart')
+  const checkout = params.get('checkout') as CheckoutView | null
 
-  if (redirectStatus && cartId) {
-    const url = new URL(window.location.href)
-    url.searchParams.delete('payment_intent')
-    url.searchParams.delete('payment_intent_client_secret')
-    url.searchParams.delete('redirect_status')
-    url.searchParams.delete('cart')
-    window.history.replaceState({}, '', url.toString())
-
+  if (cartId) {
     const knownCart = storedCarts.value.find((c) => c.cartId === cartId)
-    if (!knownCart) return
-
-    if (redirectStatus === 'failed') {
-      selectCart(cartId)
-      error.value = 'Payment failed. Please try again.'
+    if (!knownCart) {
+      loadCartProfiles()
       return
     }
 
     currentCartId.value = cartId
-    completing.value = true
     resetStripeLoader()
     subscribeToEvents(cartId)
+
+    if (checkout && checkout !== 'select') {
+      checkoutView.value = checkout
+    }
+  } else {
+    loadCartProfiles()
   }
 })
 
@@ -362,11 +378,12 @@ onUnmounted(() => unsubscribe())
       <div class="create-section">
         <h3>Create Cart</h3>
         <div class="form-row">
-          <select v-model="currencyCode">
-            <option v-for="c in ['SEK','EUR','USD','GBP','NOK','DKK']" :key="c" :value="c">{{ c }}</option>
+          <select v-model="profileKey">
+            <option value="" disabled>{{ loadingProfiles ? 'Loading...' : 'Select profile' }}</option>
+            <option v-for="p in availableProfiles" :key="p" :value="p">{{ p }}</option>
           </select>
-          <input type="text" v-model="channelKey" placeholder="Channel key" />
-          <button @click="createCart" :disabled="loading || !tenant.trim()" class="btn-primary">
+          <input type="text" v-model="locale" placeholder="Locale (e.g. sv_SE)" style="width:100px" />
+          <button @click="createCart" :disabled="loading || !tenant.trim() || !profileKey" class="btn-primary">
             {{ loading ? 'Creating...' : 'Create Cart' }}
           </button>
         </div>
@@ -378,8 +395,7 @@ onUnmounted(() => unsubscribe())
           <div>
             <code>{{ c.cartId.substring(0, 8) }}...</code>
             <span class="badge">{{ c.tenant }}</span>
-            <span class="badge">{{ c.channelKey }}</span>
-            <span class="badge">{{ c.currencyCode }}</span>
+            <span class="badge">{{ c.profileKey }}</span>
             <span v-if="c.completedAt" class="badge badge-success">✓ Completed</span>
             <span class="date">{{ formatDate(c.createdAt) }}</span>
           </div>
@@ -410,7 +426,7 @@ onUnmounted(() => unsubscribe())
       <div v-else-if="isCompleted && cart">
         <OrderConfirmation
           :cart="cart"
-          :currency-code="currentStoredCart?.currencyCode ?? 'SEK'"
+          :currency-code="cart.currencyCode ?? 'SEK'"
           @back="goBack"
         />
 
@@ -507,6 +523,16 @@ onUnmounted(() => unsubscribe())
 
           <DemoCheckout
             v-else-if="checkoutView === 'demo'"
+            :client="client"
+            :cart="cart"
+            :cart-id="currentCartId!"
+            :base-url="activeBaseUrl"
+            @back="handleCheckoutBack"
+            @completing="handleCompleting"
+          />
+
+          <KustomCheckout
+            v-else-if="checkoutView === 'kustom'"
             :client="client"
             :cart="cart"
             :cart-id="currentCartId!"

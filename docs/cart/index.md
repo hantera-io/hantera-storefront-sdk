@@ -18,10 +18,10 @@ const cart = createCartClient({
 
 ## Lifecycle
 
-1. **Create a cart** with a currency and channel
+1. **Create a cart** with a cart profile key and locale
 2. **Subscribe to events** for real-time cart updates via SSE
 3. **Add items** by product number and quantity
-4. **Set customer info** — email, phone, delivery/invoice addresses
+4. **Set customer info** — email, phone, address, optional invoice address override
 5. **Submit payment** through your [payment provider integration](/checkout/)
 6. **Cart completes** automatically when payment is confirmed
 

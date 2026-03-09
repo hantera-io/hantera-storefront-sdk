@@ -24,23 +24,36 @@ const cart = createCartClient({
 
 All mutation methods return a `CartMutationResponse` (`Cart | CartErrors`), providing the updated cart state immediately. This means you can update your UI from the mutation response without waiting for an SSE event round-trip.
 
+### `getCartProfiles()`
+
+Returns the available cart profile keys. Cart profiles are configured in the Hantera portal under System > Cart Profiles.
+
+```ts
+const profiles = await cart.getCartProfiles()
+// e.g. ['se-webshop', 'no-webshop']
+```
+
+**Returns:** `Promise<string[]>`
+
+---
+
 ### `createCart(request)`
 
-Creates a new cart.
+Creates a new cart using a cart profile. The profile determines the channel, currency, tax settings, default country, and allowed countries.
 
 ```ts
 const { cartId } = await cart.createCart({
-  currencyCode: 'SEK',
-  channelKey: 'web-se',
+  profileKey: 'se-webshop',
+  locale: 'sv_se',
 })
 ```
 
 **Parameters:**
 
-| Field          | Type     | Description                    |
-| -------------- | -------- | ------------------------------ |
-| `currencyCode` | `string` | ISO currency code (e.g. `SEK`) |
-| `channelKey`   | `string` | Sales channel identifier       |
+| Field        | Type     | Description                              |
+| ------------ | -------- | ---------------------------------------- |
+| `profileKey` | `string` | Cart profile key (configured in portal)  |
+| `locale`     | `string` | Hantera locale (e.g. `sv_SE`, `en_US`)   |
 
 **Returns:** `Promise<CreateCartResponse>` — `{ cartId: string }`
 
@@ -160,11 +173,11 @@ await cart.removeCoupon(cartId, 'SUMMER2026')
 
 ### `setAddress(cartId, request)`
 
-Sets delivery and/or invoice addresses. Pass `'unset'` to clear an address.
+Sets the cart address and/or invoice address. The `address` field is the primary address used for both delivery and invoice. The optional `invoiceAddress` overrides the invoice address when it differs from the main address. Pass `'unset'` to clear the invoice address override.
 
 ```ts
 await cart.setAddress(cartId, {
-  deliveryAddress: {
+  address: {
     name: 'John Doe',
     addressLine1: 'Storgatan 1',
     city: 'Stockholm',
@@ -177,10 +190,10 @@ await cart.setAddress(cartId, {
 
 **Parameters:**
 
-| Field             | Type                    | Description                          |
-| ----------------- | ----------------------- | ------------------------------------ |
-| `deliveryAddress` | `Address \| 'unset'`    | Delivery address or `'unset'`        |
-| `invoiceAddress`  | `Address \| 'unset'`    | Invoice address or `'unset'`         |
+| Field            | Type                    | Description                                          |
+| ---------------- | ----------------------- | ---------------------------------------------------- |
+| `address`        | `Address`               | Primary address (delivery + invoice fallback)        |
+| `invoiceAddress` | `Address \| 'unset'`    | Optional invoice address override, or `'unset'`      |
 
 **Returns:** `Promise<CartMutationResponse>`
 
@@ -251,27 +264,6 @@ await cart.deleteField(cartId, 'giftMessage')
 
 ---
 
-### `submitPayment(cartId, paymentType, body)`
-
-Submits a payment for checkout.
-
-```ts
-await cart.submitPayment(cartId, 'stripe', {
-  token: 'tok_visa',
-})
-```
-
-**Parameters:**
-
-| Field         | Type      | Description                         |
-| ------------- | --------- | ----------------------------------- |
-| `paymentType` | `string`  | Payment provider key (e.g. `stripe`) |
-| `body`        | `unknown` | Provider-specific payment payload   |
-
-**Returns:** `Promise<unknown>`
-
----
-
 ### `subscribeToCartEvents(cartId, handlers)`
 
 Subscribes to real-time cart updates via Server-Sent Events.
@@ -311,10 +303,12 @@ interface Cart {
   cartNumber: string
   orderNumber: string
   cartState: string
+  profileKey?: string
   channelKey: string
   currencyCode: string
+  locale?: string
   customer?: Record<string, unknown>
-  deliveryAddress?: Address
+  address?: Address
   invoiceAddress?: Address
   items: CartItem[]
   fields?: Record<string, unknown>
