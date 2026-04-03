@@ -183,8 +183,6 @@ function renderSnippet(htmlSnippet: string) {
   <div class="kustom-checkout">
     <button class="btn-back" @click="$emit('back')">← Back to options</button>
 
-    {{ cart?.fields?.kustomPendingHash }}<br>{{ cart?.fields?.kustomSyncHash }}
-
     <div v-if="loading" class="loading-state">Loading Kustom Checkout...</div>
     <div v-if="confirming" class="confirming-state">Confirming your payment…</div>
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
