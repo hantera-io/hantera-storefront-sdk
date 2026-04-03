@@ -29,10 +29,18 @@ const kustomSyncing = computed(() => {
   return pending != null && pending !== synced
 })
 
-watch(kustomSyncing, (syncing) => {
+watch(kustomSyncing, () => {
   const kco = (window as any)._klarnaCheckout
-  if (typeof kco === 'function') {
-    kco((api: any) => syncing ? api.suspend() : api.resume())
+  if (typeof kco === 'function' && props.cart?.fields?.kustomPendingHash !== props.cart?.fields?.kustomSyncHash) {
+    kco((api: any) => api.suspend())
+  }
+})
+
+watch(() => props.cart?.fields?.kustomSyncHash, () => {
+  const kco = (window as any)._klarnaCheckout
+  if (typeof kco === 'function' && props.cart?.fields?.kustomPendingHash === props.cart?.fields?.kustomSyncHash) {
+    kco((api: any) => api.suspend())
+    setTimeout(() => kco((api: any) => api.resume()), 0);
   }
 })
 
@@ -174,6 +182,8 @@ function renderSnippet(htmlSnippet: string) {
 <template>
   <div class="kustom-checkout">
     <button class="btn-back" @click="$emit('back')">← Back to options</button>
+
+    {{ cart?.fields?.kustomPendingHash }}<br>{{ cart?.fields?.kustomSyncHash }}
 
     <div v-if="loading" class="loading-state">Loading Kustom Checkout...</div>
     <div v-if="confirming" class="confirming-state">Confirming your payment…</div>
