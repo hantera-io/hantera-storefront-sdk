@@ -5,13 +5,12 @@ const sdkSrc = path.resolve(__dirname, '../../packages/storefront-sdk/src')
 
 export default defineConfig({
   title: 'Hantera Storefront SDK',
-  description: 'Cart, checkout, and price lookup for headless storefronts',
+  description: 'Cart and checkout for headless storefronts',
   head: [['link', { rel: 'icon', href: '/favicon.png' }]],
   vite: {
     resolve: {
       alias: {
         '@hantera/storefront-sdk/cart': path.join(sdkSrc, 'cart/index.ts'),
-        '@hantera/storefront-sdk/prices': path.join(sdkSrc, 'prices/index.ts'),
         '@hantera/storefront-sdk': path.join(sdkSrc, 'index.ts'),
       },
     },
@@ -20,7 +19,6 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Cart', link: '/cart/' },
-      { text: 'Prices', link: '/prices/' },
       { text: 'Checkout', link: '/checkout/' },
       { text: 'Playground', link: '/playground/cart' },
     ],
@@ -30,7 +28,6 @@ export default defineConfig({
         items: [
           { text: 'Getting Started', link: '/guide/getting-started' },
           { text: 'Configuration', link: '/guide/configuration' },
-          { text: 'Tree Shaking', link: '/guide/tree-shaking' },
         ],
       },
       {
@@ -38,13 +35,6 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/cart/' },
           { text: 'API Reference', link: '/cart/api' },
-        ],
-      },
-      {
-        text: 'Prices Module',
-        items: [
-          { text: 'Overview', link: '/prices/' },
-          { text: 'API Reference', link: '/prices/api' },
         ],
       },
       {
@@ -61,7 +51,6 @@ export default defineConfig({
         text: 'Playground',
         items: [
           { text: 'Cart', link: '/playground/cart' },
-          { text: 'Price Lookup', link: '/playground/prices' },
         ],
       },
     ],

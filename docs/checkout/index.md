@@ -1,6 +1,6 @@
 # Checkout
 
-The Hantera Storefront SDK provides the building blocks for implementing checkout flows with various payment providers. The SDK itself is **payment-agnostic** — you can use it with any payment provider.
+The Hantera Storefront SDK provides cart management. Payment, however, is **not** part of the SDK — each Payment Service Provider (PSP) is shipped as a separate Hantera app that exposes its own HTTP ingress.
 
 ::: tip Sample Implementations
 This documentation includes Vue-based sample implementations in the [Cart Playground](/playground/cart). You can also clone the [hantera-storefront-sdk repository](https://github.com/hantera-io/hantera-storefront-sdk) on GitHub to explore the source code.
@@ -8,14 +8,14 @@ This documentation includes Vue-based sample implementations in the [Cart Playgr
 
 ## How Checkout Works
 
-While the general flow is similar across providers, each checkout integration has its own API, client-side requirements, and response format. Refer to the individual integration guides below for specifics.
-
 The high-level pattern is:
 
 1. **Create a cart** and add items to it
-2. **Set customer information** — email, phone, address
-3. **Initiate checkout** using the payment provider's integration
+2. **Set customer information** — email, phone, address (using the SDK's cart methods)
+3. **Initiate payment** through the PSP app's HTTP ingress — see the integration guide for the exact endpoint, request shape, and response shape
 4. **Cart completes** asynchronously once the server confirms payment
+
+Each PSP integration has its own client-side requirements, server-side endpoint, and response shape. Refer to the individual integration guides below for the specifics.
 
 ## Completion Flow
 
@@ -39,12 +39,12 @@ After a payment redirect (e.g., from Stripe), reconnect to SSE and show a loadin
 
 ## Available Integrations
 
-| Integration | Payment Type | App Required | Guide |
-|---|---|---|---|
-| [Stripe](/checkout/stripe) | `stripe` | `stripe` PSP app | Card payments with Stripe Elements |
-| [Stripe Express](/checkout/stripe-express) | `stripe` | `stripe` PSP app | Apple Pay, Google Pay, Link |
-| [Demo](/checkout/demo) | `demo` | `demo-retail` app | Simulated payment for testing |
-| [Kustom (KCO)](/checkout/kustom) | `kustom` | `kustom` PSP app | Iframe checkout with address, shipping & payment |
+| Integration | App Required | Guide |
+|---|---|---|
+| [Stripe](/checkout/stripe) | `stripe` PSP app | Card payments with Stripe Elements |
+| [Stripe Express](/checkout/stripe-express) | `stripe` PSP app | Apple Pay, Google Pay, Link |
+| [Demo](/checkout/demo) | `demo-retail` app | Simulated payment for testing |
+| [Kustom (KCO)](/checkout/kustom) | `kustom` PSP app | Iframe checkout with address, shipping & payment |
 
 ## Prerequisites
 

@@ -17,7 +17,7 @@ The Stripe checkout flow works in four stages:
 
 1. **Load Stripe.js** and fetch the public key from your Hantera instance
 2. **Mount Stripe Elements** — address and payment form
-3. **Submit payment** via the SDK to get a `clientSecret`
+3. **Submit payment** by calling the Stripe PSP ingress to get a `clientSecret`
 4. **Confirm payment** with Stripe.js, which may redirect the customer for 3D Secure
 
 ## Step 1: Load Stripe.js
@@ -36,7 +36,7 @@ const stripe = Stripe(publicKey)
 ```
 
 ::: info Endpoint
-The Stripe public key endpoint is at `/ingress/stripe/publicKey` — this is registered by the Stripe PSP app independently of the commerce app.
+The Stripe public key endpoint is at `/ingress/stripe/publicKey` — this is registered by the Stripe PSP app independently of the Commerce app.
 :::
 
 ## Step 2: Create Elements and Mount the Form
@@ -46,8 +46,8 @@ Create a Stripe Elements instance and mount the payment and address elements:
 ```ts
 const elements = stripe.elements({
   mode: 'payment',
-  amount: cart.totalIncVat * 100, // Stripe expects amounts in minor units
-  currency: currencyCode.toLowerCase(),
+  amount: paymentTotal, // in minor units, e.g. cart total × 100
+  currency: cart.currencyCode.toLowerCase(),
 })
 
 // Mount the payment element
@@ -63,15 +63,37 @@ addressElement.mount('#shipping-address')
 
 The `amount` and `currency` are used for display purposes only — the actual charge amount is determined server-side when the payment intent is created.
 
-## Step 3: Submit Payment
+## Step 3: Sync addresses to the cart
 
-First validate the Elements form, then call `submitPayment` on the SDK to create a payment intent:
+When Stripe's address element completes, push the values to the cart so the server has the right shipping/billing context before payment is created. The `Address` shape uses `name` (full name) and `countryCode`:
 
 ```ts
 import { createCartClient } from '@hantera/storefront-sdk/cart'
 
 const client = createCartClient({ baseUrl })
 
+addressElement.on('change', (event) => {
+  if (!event.complete) return
+  const a = event.value.address
+  client.setAddress(cartId, {
+    address: {
+      name: event.value.name,
+      addressLine1: a.line1,
+      addressLine2: a.line2,
+      city: a.city,
+      state: a.state,
+      postalCode: a.postal_code,
+      countryCode: a.country,
+    },
+  })
+})
+```
+
+## Step 4: Submit Payment
+
+First validate the Elements form, then `POST` to the Stripe PSP ingress to create a Stripe PaymentIntent:
+
+```ts
 // Validate the form
 const { error: submitError } = await elements.submit()
 if (submitError) {
@@ -79,14 +101,18 @@ if (submitError) {
   return
 }
 
-// Create payment intent via Hantera
-const result = await client.submitPayment(cartId, 'stripe', {})
-const { clientSecret } = result
+// Create payment intent via the Stripe PSP ingress
+const res = await fetch(`${baseUrl}/ingress/commerce/carts/${cartId}/payment/stripe`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({}),
+})
+const { clientSecret } = await res.json()
 ```
 
-The Stripe app's ingress at `/ingress/commerce/carts/{cartId}/payment/stripe` creates a Stripe PaymentIntent and returns `{ clientSecret }`.
+The Stripe PSP app's ingress at `/ingress/commerce/carts/{cartId}/payment/stripe` creates a Stripe PaymentIntent for the current cart total and returns `{ clientSecret }`.
 
-## Step 4: Confirm Payment
+## Step 5: Confirm Payment
 
 Use the `clientSecret` to confirm the payment with Stripe.js. This may trigger 3D Secure authentication or redirect the customer:
 
@@ -107,7 +133,7 @@ if (error) {
 // If no error, the customer was redirected to return_url
 ```
 
-## Step 5: Handle the Return
+## Step 6: Handle the Return
 
 After Stripe redirects the customer back to your `return_url`, the cart may not be completed yet — the server processes the payment confirmation asynchronously via webhooks.
 
@@ -149,7 +175,7 @@ const stripe = Stripe(publicKey)
 // 2. Create Elements
 const elements = stripe.elements({
   mode: 'payment',
-  amount: cart.totalIncVat * 100,
+  amount: paymentTotal,
   currency: 'sek',
 })
 elements.create('payment').mount('#payment-element')
@@ -160,12 +186,16 @@ async function handleCheckout() {
   const { error: formError } = await elements.submit()
   if (formError) return
 
-  // Set customer info on the cart
+  // Make sure customer info is on the cart
   await client.setEmail(cartId, email)
-  await client.setAddress(cartId, { deliveryAddress, invoiceAddress })
 
-  // Create payment intent
-  const { clientSecret } = await client.submitPayment(cartId, 'stripe', {})
+  // Create payment intent via the Stripe PSP ingress
+  const res = await fetch(`${baseUrl}/ingress/commerce/carts/${cartId}/payment/stripe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  const { clientSecret } = await res.json()
 
   // 4. Confirm with Stripe
   const { error } = await stripe.confirmPayment({
@@ -199,6 +229,6 @@ function waitForCompletion(cartId: string) {
 | Error Source | When | How to Handle |
 |---|---|---|
 | `elements.submit()` | Form validation fails | Show inline validation errors |
-| `submitPayment()` | Server rejects the request | Show error message, allow retry |
+| Stripe PSP ingress | Server rejects the request | Show error message, allow retry |
 | `confirmPayment()` | Card declined, 3DS failed | Show Stripe's error message |
 | SSE `onError` | Payment processing failed | Show failure message |

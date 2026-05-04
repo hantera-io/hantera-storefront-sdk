@@ -1,6 +1,6 @@
 # @hantera/storefront-sdk
 
-TypeScript SDK for building storefronts on the Hantera platform. Provides tree-shakeable modules for cart/checkout and price lookup APIs.
+TypeScript SDK for building storefronts on the Hantera platform. Provides a tree-shakeable cart and checkout client.
 
 ## Installation
 
@@ -10,48 +10,27 @@ yarn add @hantera/storefront-sdk
 
 ## Quick Start
 
-### Cart
-
 ```ts
 import { createCartClient } from '@hantera/storefront-sdk/cart'
 
 const cart = createCartClient({
-  baseUrl: 'https://your-instance.hantera.io/ingress/store',
+  baseUrl: 'https://core.your-instance.hantera.cloud',
 })
 
 const { cartId } = await cart.createCart({
-  currencyCode: 'SEK',
-  channelKey: 'web-se',
+  profileKey: 'se-webshop',
+  locale: 'sv_se',
 })
 
 await cart.addItem(cartId, { productNumber: 'PROD-001', quantity: 1 })
-```
-
-### Prices
-
-```ts
-import { createPriceClient } from '@hantera/storefront-sdk/prices'
-
-const prices = createPriceClient({
-  baseUrl: 'https://your-instance.hantera.io/ingress/store',
-})
-
-const result = await prices.lookup({
-  productNumbers: ['PROD-001'],
-  priceListKeys: ['RETAIL'],
-  currencyCode: 'SEK',
-})
 ```
 
 ## Modules
 
 | Import path                       | Description                                  |
 | --------------------------------- | -------------------------------------------- |
-| `@hantera/storefront-sdk`         | Re-exports all modules                       |
+| `@hantera/storefront-sdk`         | Re-exports the cart module                   |
 | `@hantera/storefront-sdk/cart`    | Cart & checkout client with SSE subscriptions |
-| `@hantera/storefront-sdk/prices`  | Price lookup with 30-day timeline             |
-
-Each module can be imported independently for optimal tree-shaking.
 
 ## Documentation
 

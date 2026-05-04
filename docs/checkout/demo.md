@@ -20,10 +20,10 @@ Demo checkout is useful for:
 
 ## Overview
 
-The Demo checkout follows the same pattern as any other checkout integration:
+The Demo checkout follows the same pattern as any other PSP integration:
 
 1. **Collect customer information** — email, phone, addresses
-2. **Submit payment** with `submitPayment(cartId, 'demo', {})`
+2. **Submit payment** by `POST`ing to the `demo-retail` payment ingress
 3. **Wait for completion** via SSE
 
 No external payment SDK is needed — the "payment" is handled entirely server-side.
@@ -40,31 +40,28 @@ const client = createCartClient({ baseUrl })
 await client.setEmail(cartId, 'customer@example.com')
 await client.setPhone(cartId, '+46701234567')
 await client.setAddress(cartId, {
-  deliveryAddress: {
-    firstName: 'Anna',
-    lastName: 'Svensson',
+  address: {
+    name: 'Anna Svensson',
     addressLine1: 'Storgatan 1',
     postalCode: '54230',
     city: 'Mariestad',
-    country: 'SE',
-  },
-  invoiceAddress: {
-    firstName: 'Anna',
-    lastName: 'Svensson',
-    addressLine1: 'Storgatan 1',
-    postalCode: '54230',
-    city: 'Mariestad',
-    country: 'SE',
+    countryCode: 'SE',
   },
 })
 ```
 
+The `Address` shape uses `name` (full name) and `countryCode` — the cart's primary address is also used as the invoice address unless `invoiceAddress` is set explicitly.
+
 ## Step 2: Submit Payment
 
-Call `submitPayment` with the `demo` payment type. No request body is needed:
+Call the `demo-retail` payment ingress. No request body is needed:
 
 ```ts
-await client.submitPayment(cartId, 'demo', {})
+await fetch(`${baseUrl}/ingress/commerce/carts/${cartId}/payment/demo`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({}),
+})
 ```
 
 The `demo-retail` app handles this by immediately creating a payment authorization on the server side.
@@ -96,12 +93,15 @@ const client = createCartClient({ baseUrl })
 await client.setEmail(cartId, email)
 await client.setPhone(cartId, phone)
 await client.setAddress(cartId, {
-  deliveryAddress: { firstName, lastName, addressLine1, postalCode, city, country },
-  invoiceAddress: { firstName, lastName, addressLine1, postalCode, city, country },
+  address: { name, addressLine1, postalCode, city, countryCode },
 })
 
 // Submit demo payment
-await client.submitPayment(cartId, 'demo', {})
+await fetch(`${baseUrl}/ingress/commerce/carts/${cartId}/payment/demo`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({}),
+})
 
 // Wait for completion
 const eventSource = client.subscribeToCartEvents(cartId, {

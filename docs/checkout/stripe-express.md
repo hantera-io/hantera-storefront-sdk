@@ -21,7 +21,7 @@ The flow:
 
 1. **Load Stripe.js** and create an Express Checkout Element
 2. **Mount the button** — Stripe auto-detects available wallets
-3. **Handle the `confirm` event** — set addresses, submit payment, confirm
+3. **Handle the `confirm` event** — set addresses on the cart, call the Stripe PSP ingress, confirm
 4. **Wait for completion** via SSE
 
 ## Step 1: Load Stripe.js and Create Elements
@@ -35,8 +35,8 @@ const stripe = Stripe(publicKey)
 
 const elements = stripe.elements({
   mode: 'payment',
-  amount: cart.totalIncVat * 100,
-  currency: currencyCode.toLowerCase(),
+  amount: paymentTotal, // in minor units
+  currency: cart.currencyCode.toLowerCase(),
 })
 ```
 
@@ -63,7 +63,7 @@ The Express Checkout Element emits several events during the payment flow:
 
 ### `confirm` — Customer Authorized Payment
 
-This is the main event. The customer has authorized payment in their wallet. Extract their details, set them on the cart, then confirm:
+This is the main event. The customer has authorized payment in their wallet. Extract their details, set them on the cart, then call the Stripe PSP ingress and confirm. The cart `Address` shape uses `name` (full name) and `countryCode`:
 
 ```ts
 import { createCartClient } from '@hantera/storefront-sdk/cart'
@@ -71,7 +71,7 @@ import { createCartClient } from '@hantera/storefront-sdk/cart'
 const client = createCartClient({ baseUrl })
 
 expressCheckout.on('confirm', async (event) => {
-  const { billingDetails, shippingAddress, expressPaymentType } = event
+  const { billingDetails, shippingAddress } = event
 
   // Set customer info on the cart
   if (billingDetails?.email) {
@@ -80,20 +80,24 @@ expressCheckout.on('confirm', async (event) => {
 
   if (shippingAddress) {
     await client.setAddress(cartId, {
-      deliveryAddress: {
-        firstName: shippingAddress.name?.split(' ')[0] ?? '',
-        lastName: shippingAddress.name?.split(' ').slice(1).join(' ') ?? '',
-        addressLine1: shippingAddress.address?.line1 ?? '',
-        addressLine2: shippingAddress.address?.line2 ?? '',
-        postalCode: shippingAddress.address?.postal_code ?? '',
-        city: shippingAddress.address?.city ?? '',
-        country: shippingAddress.address?.country ?? '',
+      address: {
+        name: shippingAddress.name,
+        addressLine1: shippingAddress.address?.line1,
+        addressLine2: shippingAddress.address?.line2,
+        postalCode: shippingAddress.address?.postal_code,
+        city: shippingAddress.address?.city,
+        countryCode: shippingAddress.address?.country,
       },
     })
   }
 
-  // Create payment intent
-  const { clientSecret } = await client.submitPayment(cartId, 'stripe', {})
+  // Create payment intent via the Stripe PSP ingress
+  const res = await fetch(`${baseUrl}/ingress/commerce/carts/${cartId}/payment/stripe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  const { clientSecret } = await res.json()
 
   // Confirm payment
   const { error } = await stripe.confirmPayment({
@@ -163,84 +167,6 @@ const eventSource = client.subscribeToCartEvents(cartId, {
     }
   },
 })
-```
-
-## Complete Example
-
-```ts
-import Stripe from 'stripe'
-import { createCartClient } from '@hantera/storefront-sdk/cart'
-
-const baseUrl = 'https://core.your-instance.hantera.cloud'
-const client = createCartClient({ baseUrl })
-
-// 1. Load Stripe
-const { publicKey } = await fetch(`${baseUrl}/ingress/stripe/publicKey`).then(r => r.json())
-const stripe = Stripe(publicKey)
-
-const elements = stripe.elements({
-  mode: 'payment',
-  amount: cart.totalIncVat * 100,
-  currency: 'sek',
-})
-
-// 2. Mount express checkout
-const expressCheckout = elements.create('expressCheckout', {
-  buttonType: { applePay: 'buy', googlePay: 'buy' },
-})
-expressCheckout.mount('#express-checkout')
-
-// 3. Handle confirm
-expressCheckout.on('confirm', async (event) => {
-  const { billingDetails, shippingAddress } = event
-
-  if (billingDetails?.email) {
-    await client.setEmail(cartId, billingDetails.email)
-  }
-
-  if (shippingAddress) {
-    await client.setAddress(cartId, {
-      deliveryAddress: {
-        firstName: shippingAddress.name?.split(' ')[0] ?? '',
-        lastName: shippingAddress.name?.split(' ').slice(1).join(' ') ?? '',
-        addressLine1: shippingAddress.address?.line1 ?? '',
-        postalCode: shippingAddress.address?.postal_code ?? '',
-        city: shippingAddress.address?.city ?? '',
-        country: shippingAddress.address?.country ?? '',
-      },
-    })
-  }
-
-  const { clientSecret } = await client.submitPayment(cartId, 'stripe', {})
-
-  const { error } = await stripe.confirmPayment({
-    elements,
-    clientSecret,
-    confirmParams: {
-      return_url: `${window.location.origin}/confirmation?cartId=${cartId}`,
-    },
-  })
-
-  if (error) {
-    // Show error
-  }
-})
-
-expressCheckout.on('cancel', () => {
-  // Reset loading state
-})
-
-// 4. On return page — wait for completion
-function waitForCompletion(cartId: string) {
-  const eventSource = client.subscribeToCartEvents(cartId, {
-    onUpdate: (cartData) => {
-      if (cartData.cartState === 'completed') {
-        eventSource.close()
-        showOrderConfirmation(cartData)
-      }
-    },
-  })
-}
 ```
 
 ## Differences from Standard Stripe Checkout

@@ -121,7 +121,7 @@ await cart.removeItem(cartId, {
 
 ### `setQuantity(cartId, request)`
 
-Sets the quantity of an existing cart item. The cart is re-validated (including price lookup) before applying the change.
+Sets the quantity of an existing cart item. The cart is re-rendered before the response is returned, so totals reflect the new quantity.
 
 ```ts
 await cart.setQuantity(cartId, {
@@ -261,6 +261,12 @@ await cart.deleteField(cartId, 'giftMessage')
 | `key` | `string` | Custom field key to remove   |
 
 **Returns:** `Promise<CartMutationResponse>`
+
+---
+
+### Submitting payment
+
+Payment is **not** part of the SDK surface. Each Payment Service Provider (Stripe, Kustom etc.) is shipped as a separate Hantera app that exposes its own HTTP ingress, with its own URL, request shape, and response shape. See the [Checkout guides](/checkout/) for the concrete integration per provider.
 
 ---
 

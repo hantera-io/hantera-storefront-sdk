@@ -1,6 +1,6 @@
 # Configuration
 
-Both `createCartClient` and `createPriceClient` accept a configuration object with the same shape:
+`createCartClient` accepts a configuration object with a single property:
 
 ```ts
 interface ClientOptions {
@@ -10,7 +10,7 @@ interface ClientOptions {
 
 ## `baseUrl`
 
-The base URL of your Hantera instance. The SDK automatically constructs the correct ingress paths for each module (Commerce for carts, Price Lists for prices).
+The base URL of your Hantera instance. The SDK automatically appends the `/ingress/commerce/...` paths required by the Commerce app.
 
 ```ts
 const cart = createCartClient({
@@ -18,11 +18,13 @@ const cart = createCartClient({
 })
 ```
 
-## Separate Clients
+## Tree-shakeable subpath import
 
-Cart and price operations use independent clients. This means you can point them at different backends if needed, or only instantiate the one you need:
+If you want to skip the convenience re-export at `@hantera/storefront-sdk` and let your bundler trim the package down to exactly what you use, import from the cart subpath directly:
 
 ```ts
-const cart = createCartClient({ baseUrl: 'https://core.your-instance.hantera.cloud' })
-const prices = createPriceClient({ baseUrl: 'https://core.your-instance.hantera.cloud' })
+import { createCartClient, isCartErrors } from '@hantera/storefront-sdk/cart'
+import type { Cart, AddItemRequest } from '@hantera/storefront-sdk/cart'
 ```
+
+Both subpath imports and the top-level entry point ship as ESM and CJS, with `sideEffects: false` set so unused code can be eliminated.

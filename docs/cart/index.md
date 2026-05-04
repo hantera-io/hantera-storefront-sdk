@@ -22,7 +22,7 @@ const cart = createCartClient({
 2. **Subscribe to events** for real-time cart updates via SSE
 3. **Add items** by product number and quantity
 4. **Set customer info** — email, phone, address, optional invoice address override
-5. **Submit payment** through your [payment provider integration](/checkout/)
+5. **Submit payment** by `POST`ing to the PSP app's payment ingress (see [Checkout](/checkout/))
 6. **Cart completes** automatically when payment is confirmed
 
 ## Real-time Updates
@@ -55,14 +55,9 @@ See the [API Reference](/cart/api) for the full method list.
 
 ## Checkout
 
-Once items are in the cart and customer info is set, proceed to checkout using `submitPayment`:
-
-```ts
-const result = await cart.submitPayment(cartId, 'stripe', {})
-```
-
-The SDK supports multiple payment providers through a consistent interface. See the [Checkout documentation](/checkout/) for integration guides:
+Once items are in the cart and customer info is set, the storefront initiates payment by calling the PSP app's payment ingress. Each PSP app exposes its own HTTP endpoint with its own request and response shape — see the per-provider guides:
 
 - [Stripe](/checkout/stripe) — Card payments with Stripe Elements
 - [Stripe Express](/checkout/stripe-express) — Apple Pay, Google Pay, Link
+- [Kustom (KCO)](/checkout/kustom) — Iframe checkout
 - [Demo](/checkout/demo) — Simulated payment for testing
