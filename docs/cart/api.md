@@ -333,6 +333,7 @@ interface CartItem {
   cartItemId: string
   productNumber: string
   quantity: number
+  reservedQuantity: number
   description?: string
   image?: string
   total: number
