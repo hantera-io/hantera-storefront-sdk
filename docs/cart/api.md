@@ -173,7 +173,7 @@ await cart.removeCoupon(cartId, 'SUMMER2026')
 
 ### `setAddress(cartId, request)`
 
-Sets the cart address and/or invoice address. The `address` field is the primary address used for both delivery and invoice. The optional `invoiceAddress` overrides the invoice address when it differs from the main address. Pass `'unset'` to clear the invoice address override.
+Sets the cart address and/or invoice address. The `address` field is the primary address used for both delivery and invoice. The optional `invoiceRecipient` overrides the invoice address when it differs from the main address. Pass `'unset'` to clear the invoice address override.
 
 ```ts
 await cart.setAddress(cartId, {
@@ -184,7 +184,7 @@ await cart.setAddress(cartId, {
     postalCode: '11122',
     countryCode: 'SE',
   },
-  invoiceAddress: 'unset',
+  invoiceRecipient: 'unset',
 })
 ```
 
@@ -193,7 +193,7 @@ await cart.setAddress(cartId, {
 | Field            | Type                    | Description                                          |
 | ---------------- | ----------------------- | ---------------------------------------------------- |
 | `address`        | `Address`               | Primary address (delivery + invoice fallback)        |
-| `invoiceAddress` | `Address \| 'unset'`    | Optional invoice address override, or `'unset'`      |
+| `invoiceRecipient` | `InvoiceRecipient \| Address \| 'unset'`    | Optional invoice recipient override, or `'unset'`      |
 
 **Returns:** `Promise<CartMutationResponse>`
 
@@ -315,7 +315,7 @@ interface Cart {
   locale?: string
   customer?: Record<string, unknown>
   address?: Address
-  invoiceAddress?: Address
+  invoiceRecipient?: InvoiceRecipient
   items: CartItem[]
   fields?: Record<string, unknown>
   taxIncluded: boolean
@@ -355,6 +355,25 @@ interface Address {
   state?: string
   postalCode?: string
   countryCode?: string
+}
+```
+
+### `InvoiceRecipient`
+
+```ts
+interface Address {
+  name?: string
+  careOf?: string
+  attention?: string
+  addressLine1?: string
+  addressLine2?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  countryCode?: string
+  taxId?: string
+  taxIdType?: string
+  taxCountryCode?: string
 }
 ```
 

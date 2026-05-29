@@ -21,6 +21,12 @@ export interface Address {
   countryCode?: string
 }
 
+export interface InvoiceRecipient extends Address {
+  taxId?: string
+  taxIdType?: string
+  taxCountryCode?: string
+}
+
 export interface OrderLine {
   productNumber: string
   quantity: number
@@ -53,7 +59,7 @@ export interface Cart {
   locale?: string
   customer?: Record<string, unknown>
   address?: Address
-  invoiceAddress?: Address
+  invoiceRecipient?: InvoiceRecipient
   items: CartItem[]
   fields?: Record<string, unknown>
   taxIncluded: boolean
@@ -95,7 +101,7 @@ export interface RemoveItemRequest {
 
 export interface SetAddressRequest {
   address?: Address
-  invoiceAddress?: Address | 'unset'
+  invoiceRecipient?: InvoiceRecipient | 'unset'
 }
 
 export interface SetQuantityRequest {

@@ -169,7 +169,7 @@ function initElements() {
     if (event.complete) {
       const addr = event.value.address
       props.client.setAddress(props.cartId, {
-        invoiceAddress: {
+        invoiceRecipient: {
           name: event.value.name,
           addressLine1: addr.line1,
           addressLine2: addr.line2,

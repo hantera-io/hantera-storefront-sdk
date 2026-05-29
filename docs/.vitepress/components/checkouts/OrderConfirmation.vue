@@ -67,9 +67,9 @@ function formatAddress(address: any): string {
         <p class="address-text">{{ formatAddress(cart.deliveryAddress) }}</p>
       </div>
 
-      <div class="detail-section" v-if="cart.invoiceAddress">
+      <div class="detail-section" v-if="cart.invoiceRecipient">
         <h4>Invoice Address</h4>
-        <p class="address-text">{{ formatAddress(cart.invoiceAddress) }}</p>
+        <p class="address-text">{{ formatAddress(cart.invoiceRecipient) }}</p>
       </div>
 
       <div class="detail-section" v-if="cart.items?.length">

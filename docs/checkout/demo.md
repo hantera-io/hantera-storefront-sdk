@@ -50,7 +50,7 @@ await client.setAddress(cartId, {
 })
 ```
 
-The `Address` shape uses `name` (full name) and `countryCode` — the cart's primary address is also used as the invoice address unless `invoiceAddress` is set explicitly.
+The `Address` shape uses `name` (full name) and `countryCode` — the cart's primary address is also used as the invoice recipient unless `invoiceRecipient` is set explicitly.
 
 ## Step 2: Submit Payment
 

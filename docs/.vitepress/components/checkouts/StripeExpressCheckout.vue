@@ -73,7 +73,7 @@ function initElements() {
     let updateAddress = false
 
     if (event.billingDetails) {
-      addressRequest.invoiceAddress = {
+      addressRequest.invoiceRecipient = {
         name: event.billingDetails.name,
         addressLine1: event.billingDetails.address.line1,
         addressLine2: event.billingDetails.address.line2,
