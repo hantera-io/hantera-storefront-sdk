@@ -83,6 +83,7 @@ export type CartMutationResponse = Cart | CartErrors
 
 export interface CreateCartRequest {
   profileKey: string
+  countryCode?: string
   locale: string
 }
 
