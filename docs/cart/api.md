@@ -340,7 +340,7 @@ interface Cart {
   productTotal: number
   orderTotal: number
   orderTaxTotal: number
-  shippingDiscountTotal: number
+  shippingDiscount: number
   shippingTotal: number
   shippingTax: number
   email?: string
