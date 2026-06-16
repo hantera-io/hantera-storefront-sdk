@@ -264,6 +264,24 @@ await cart.deleteField(cartId, 'giftMessage')
 
 ---
 
+### `cancelOrder(cartId)`
+
+Cancels the order created from a completed cart. This is intended for immediate, customer-initiated cancellation from the order confirmation page, before any delivery enters processing.
+
+Cancellation only succeeds while every delivery on the order is still open (or already cancelled) and the order has not been invoiced. If those conditions aren't met, the response is a `CartErrors` with code `CANCEL_ORDER_FAILED`. If the cart has not yet produced an order (it isn't completed), the response is a `CartErrors` with code `NO_ORDER`. On success, the re-rendered cart is returned with the order in its cancelled state.
+
+```ts
+const result = await cart.cancelOrder(cartId)
+
+if (isCartErrors(result)) {
+  result.errors.forEach((e) => console.error(e.code, e.message))
+}
+```
+
+**Returns:** `Promise<CartMutationResponse>`
+
+---
+
 ### Submitting payment
 
 Payment is **not** part of the SDK surface. Each Payment Service Provider (Stripe, Kustom etc.) is shipped as a separate Hantera app that exposes its own HTTP ingress, with its own URL, request shape, and response shape. See the [Checkout guides](/checkout/) for the concrete integration per provider.

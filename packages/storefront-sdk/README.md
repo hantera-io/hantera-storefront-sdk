@@ -39,6 +39,10 @@ const result = await prices.lookup({
   priceListKeys: ['RETAIL'],
   currencyCode: 'SEK',
 })
+
+// Cancel the order created from a completed cart
+// (only allowed before any delivery enters processing)
+await cart.cancelOrder(cartId)
 ```
 
 ## Documentation

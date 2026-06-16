@@ -141,6 +141,15 @@ export class CartClient {
     return response
   }
 
+  async cancelOrder(cartId: string): Promise<CartMutationResponse> {
+    const response = await this.http.request<CartMutationResponse>(
+      'POST',
+      `/ingress/commerce/carts/${cartId}/cancel-order`,
+    )
+    this.notifyUpdate(cartId, response)
+    return response
+  }
+
   subscribeToCartEvents(cartId: string, handlers: CartEventHandlers): EventSource {
     this.eventHandlers.set(cartId, handlers)
 
