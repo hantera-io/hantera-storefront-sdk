@@ -13,8 +13,6 @@ export type {
   CreateCartRequest,
   CreateCartResponse,
   Discount,
-  OrderLine,
-  OrderPreview,
   RemoveItemRequest,
   SetAddressRequest,
   SetFieldRequest,

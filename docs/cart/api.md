@@ -337,10 +337,21 @@ interface Cart {
   items: CartItem[]
   fields?: Record<string, unknown>
   taxIncluded: boolean
+  productTotal: number
   orderTotal: number
   orderTaxTotal: number
+  shippingDiscountTotal: number
+  shippingTotal: number
+  shippingTax: number
   email?: string
   phone?: string
+  promotions: [{
+    calculatedTotal: number,
+    description: string,
+    messageRendered: string | null,
+    messageTemplate: string | null,
+    messageType: string | null
+  }]
 }
 ```
 
@@ -351,12 +362,12 @@ interface CartItem {
   cartItemId: string
   productNumber: string
   quantity: number
-  reservedQuantity: number
   description?: string
   image?: string
   total: number
   tax: number
   unitPrice: number
+  discount: number
 }
 ```
 

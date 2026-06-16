@@ -7,6 +7,7 @@ export interface CartItem {
   total: number
   tax: number
   unitPrice: number
+  discount: number
 }
 
 export interface Address {
@@ -27,27 +28,6 @@ export interface InvoiceRecipient extends Address {
   taxCountryCode?: string
 }
 
-export interface OrderLine {
-  productNumber: string
-  quantity: number
-  unitPrice: number
-  rowAmount: number
-}
-
-export interface Discount {
-  amount: number
-  name: string
-}
-
-export interface OrderPreview {
-  orderLines: OrderLine[]
-  deliveryAddress?: Address
-  discounts: Discount[]
-  subtotal: number
-  discountTotal: number
-  total: number
-}
-
 export interface Cart {
   cartId: string
   cartNumber: string
@@ -63,10 +43,21 @@ export interface Cart {
   items: CartItem[]
   fields?: Record<string, unknown>
   taxIncluded: boolean
+  productTotal: number
   orderTotal: number
   orderTaxTotal: number
+  shippingDiscountTotal: number
+  shippingTotal: number
+  shippingTax: number
   email?: string
   phone?: string
+  promotions: [{
+    calculatedTotal: number,
+    description: string,
+    messageRendered: string | null,
+    messageTemplate: string | null,
+    messageType: string | null
+  }]
 }
 
 export interface CartErrorItem {
