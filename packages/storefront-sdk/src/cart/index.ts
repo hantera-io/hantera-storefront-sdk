@@ -12,7 +12,6 @@ export type {
   CartMutationResponse,
   CreateCartRequest,
   CreateCartResponse,
-  Discount,
   RemoveItemRequest,
   SetAddressRequest,
   SetFieldRequest,
