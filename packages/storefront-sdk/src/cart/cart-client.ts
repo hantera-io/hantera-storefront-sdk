@@ -5,6 +5,7 @@ import type {
   CartErrors,
   CartEventHandlers,
   CartMutationResponse,
+  CartProfile,
   CreateCartRequest,
   CreateCartResponse,
   RemoveItemRequest,
@@ -30,8 +31,8 @@ export class CartClient {
     }
   }
 
-  async getCartProfiles(): Promise<string[]> {
-    return this.http.request<string[]>('GET', '/ingress/commerce/cart-profiles')
+  async getCartProfiles(): Promise<CartProfile[]> {
+    return this.http.request<CartProfile[]>('GET', '/ingress/commerce/cart-profiles')
   }
 
   async createCart(request: CreateCartRequest): Promise<CreateCartResponse> {

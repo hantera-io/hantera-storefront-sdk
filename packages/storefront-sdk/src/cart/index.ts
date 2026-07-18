@@ -10,6 +10,7 @@ export type {
   CartEventHandlers,
   CartItem,
   CartMutationResponse,
+  CartProfile,
   CreateCartRequest,
   CreateCartResponse,
   RemoveItemRequest,

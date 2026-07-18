@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { createCartClient, isCartErrors } from '@hantera/storefront-sdk/cart'
-import type { Cart, CartErrors, CartMutationResponse } from '@hantera/storefront-sdk/cart'
+import type { Cart, CartErrors, CartMutationResponse, CartProfile } from '@hantera/storefront-sdk/cart'
 import { resolveBaseUrl } from '../utils/resolve-base-url'
 import CheckoutSelector from './checkouts/CheckoutSelector.vue'
 import StripeCheckout from './checkouts/StripeCheckout.vue'
@@ -33,7 +33,7 @@ const syncing = ref(false)
 const completing = ref(false)
 const error = ref<string | null>(null)
 const profileKey = ref('')
-const availableProfiles = ref<string[]>([])
+const availableProfiles = ref<CartProfile[]>([])
 const locale = ref('sv_SE')
 const loadingProfiles = ref(false)
 const productNumber = ref('')
@@ -59,6 +59,11 @@ const activeBaseUrl = computed(() => {
 })
 
 const client = computed(() => createCartClient({ baseUrl: activeBaseUrl.value }))
+
+const currentProfile = computed(() => {
+  const key = cart.value?.profileKey ?? currentStoredCart.value?.profileKey
+  return availableProfiles.value.find((p) => p.profileKey === key) ?? null
+})
 
 watch(
   () => cart.value?.cartState,
@@ -103,7 +108,7 @@ async function loadCartProfiles() {
   try {
     availableProfiles.value = await client.value.getCartProfiles()
     if (availableProfiles.value.length > 0 && !profileKey.value) {
-      profileKey.value = availableProfiles.value[0]
+      profileKey.value = availableProfiles.value[0].profileKey
     }
   } catch {
     availableProfiles.value = []
@@ -155,6 +160,9 @@ function selectCart(cartId: string) {
   completing.value = false
   resetStripeLoader()
   subscribeToEvents(cartId)
+  if (availableProfiles.value.length === 0) {
+    loadCartProfiles()
+  }
 }
 
 function subscribeToEvents(cartId: string) {
@@ -349,6 +357,7 @@ onMounted(() => {
     currentCartId.value = cartId
     resetStripeLoader()
     subscribeToEvents(cartId)
+    loadCartProfiles()
 
     if (checkout && checkout !== 'select') {
       checkoutView.value = checkout
@@ -380,7 +389,7 @@ onUnmounted(() => unsubscribe())
         <div class="form-row">
           <select v-model="profileKey">
             <option value="" disabled>{{ loadingProfiles ? 'Loading...' : 'Select profile' }}</option>
-            <option v-for="p in availableProfiles" :key="p" :value="p">{{ p }}</option>
+            <option v-for="p in availableProfiles" :key="p.profileKey" :value="p.profileKey">{{ p.profileKey }}</option>
           </select>
           <input type="text" v-model="locale" placeholder="Locale (e.g. sv_SE)" style="width:100px" />
           <button @click="createCart" :disabled="loading || !tenant.trim() || !profileKey" class="btn-primary">
@@ -527,6 +536,7 @@ onUnmounted(() => unsubscribe())
             :cart="cart"
             :cart-id="currentCartId!"
             :base-url="activeBaseUrl"
+            :profile="currentProfile"
             @back="handleCheckoutBack"
             @completing="handleCompleting"
           />

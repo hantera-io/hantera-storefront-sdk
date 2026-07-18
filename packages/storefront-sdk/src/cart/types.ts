@@ -60,6 +60,15 @@ export interface Cart {
   }]
 }
 
+export interface CartProfile {
+  profileKey: string
+  channelKey: string
+  currencyCode: string
+  taxIncluded: boolean
+  defaultCountryCode: string
+  allowedCountries: string[]
+}
+
 export interface CartErrorItem {
   code: string
   message: string
