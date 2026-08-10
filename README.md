@@ -32,6 +32,13 @@ await cart.addItem(cartId, { productNumber: 'PROD-001', quantity: 1 })
 | `@hantera/storefront-sdk`         | Re-exports the cart module                   |
 | `@hantera/storefront-sdk/cart`    | Cart & checkout client with SSE subscriptions |
 
+## Conversion Tracking
+
+Hantera's tracking apps report conversions server-side and need browser-side
+identifiers (GA client/session ids, Meta `_fbp`/`_fbc`, Awin `awc`) carried onto
+the cart. See the **Tracking** section of the docs for the capture-and-buffer
+pattern and Google Tag Manager recipes.
+
 ## Documentation
 
 The full documentation and interactive playground is available at the docs site. To run it locally:

@@ -20,6 +20,7 @@ export default defineConfig({
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Cart', link: '/cart/' },
       { text: 'Checkout', link: '/checkout/' },
+      { text: 'Tracking', link: '/tracking/' },
       { text: 'Playground', link: '/playground/cart' },
     ],
     sidebar: [
@@ -45,6 +46,12 @@ export default defineConfig({
           { text: 'Stripe Express', link: '/checkout/stripe-express' },
           { text: 'Kustom (KCO)', link: '/checkout/kustom' },
           { text: 'Demo', link: '/checkout/demo' },
+        ],
+      },
+      {
+        text: 'Tracking',
+        items: [
+          { text: 'Conversion Tracking', link: '/tracking/' },
         ],
       },
       {
