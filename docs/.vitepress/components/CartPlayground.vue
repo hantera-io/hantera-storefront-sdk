@@ -448,7 +448,18 @@ onUnmounted(() => unsubscribe())
       <!-- Active cart state -->
       <div v-else-if="cart">
         <div class="add-item-form">
-          <input v-model="productNumber" placeholder="Product number" @keydown.enter="addItem" />
+          <input v-model="productNumber" placeholder="Product number" type="search" @keydown.enter="addItem" list="products"/>
+          <datalist id="products">
+            <option value="TB030-OAK">Dining Table Oak</option>
+            <option value="AC001-BLK">Wool Beanie Black</option>
+            <option value="PN020-BLU-34">Hiking Pants Blue 34</option>
+            <option value="PN020-BLU-32">Hiking Pants Blue 32</option>
+            <option value="JK010-GRN-L">Alpine Jacket Green L</option>
+            <option value="JK010-GRN-M">Alpine Jacket Green M</option>
+            <option value="SH005-WHT-10">Sneakers White 10</option>
+            <option value="SH005-BLK-11">Sneakers Black 11</option>
+            <option value="SH005-BLK-10">Sneakers Black 10</option>
+          </datalist>
           <input v-model.number="quantity" type="number" min="1" style="width:60px" />
           <button @click="addItem" :disabled="!productNumber.trim()" class="btn-primary btn-sm">Add</button>
         </div>
