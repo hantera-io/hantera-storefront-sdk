@@ -1,21 +1,26 @@
 {
   "name": "@hantera/storefront-sdk",
   "version": "0.1.0",
-  "description": "Hantera Storefront SDK — cart and checkout for headless storefronts",
+  "description": "Hantera Storefront SDK — cart, checkout, and customer order lookup for headless storefronts",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     },
     "./cart": {
+      "types": "./dist/cart/index.d.ts",
       "import": "./dist/cart/index.js",
-      "require": "./dist/cart/index.cjs",
-      "types": "./dist/cart/index.d.ts"
+      "require": "./dist/cart/index.cjs"
+    },
+    "./orders": {
+      "types": "./dist/orders/index.d.ts",
+      "import": "./dist/orders/index.js",
+      "require": "./dist/orders/index.cjs"
     }
   },
   "files": [

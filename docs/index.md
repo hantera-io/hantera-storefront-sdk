@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Hantera Storefront SDK
   text: Build headless storefronts
-  tagline: Cart and checkout — framework-agnostic, tree-shakeable, TypeScript-first.
+  tagline: Cart, checkout, and customer order lookup — framework-agnostic, tree-shakeable, TypeScript-first.
   actions:
     - theme: brand
       text: Get Started
@@ -22,4 +22,6 @@ features:
     details: Import only the cart subpath when you don't need the convenience re-exports. Pure ESM/CJS dual build.
   - title: 🔧 Framework Agnostic
     details: Pure TypeScript with zero framework dependencies. Works with Vue, React, Svelte, vanilla JS, or anything else.
+  - title: 📦 Order Lookup
+    details: Customer self-service lookup by live cart, order, or delivery reference plus e-mail.
 ---

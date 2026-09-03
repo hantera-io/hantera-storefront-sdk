@@ -1,6 +1,6 @@
 # @hantera/storefront-sdk
 
-Cart, checkout, and price lookup for headless storefronts powered by [Hantera](https://www.hantera.io).
+Cart, checkout, and customer order lookup for headless storefronts powered by [Hantera](https://www.hantera.io).
 
 ## Installation
 
@@ -11,20 +11,20 @@ npm install @hantera/storefront-sdk
 ## Quick Start
 
 ```ts
-import { createCartClient, createPriceClient } from '@hantera/storefront-sdk'
+import { createCartClient, createOrdersClient } from '@hantera/storefront-sdk'
 
 const cart = createCartClient({
   baseUrl: 'https://core.your-instance.hantera.cloud',
 })
 
-const prices = createPriceClient({
+const orders = createOrdersClient({
   baseUrl: 'https://core.your-instance.hantera.cloud',
 })
 
 // Create a cart
 const { cartId } = await cart.createCart({
-  currencyCode: 'SEK',
-  channelKey: 'retail_SE',
+  profileKey: 'se-webshop',
+  locale: 'sv_SE',
 })
 
 // Add an item
@@ -33,11 +33,10 @@ await cart.addItem(cartId, {
   quantity: 1,
 })
 
-// Look up prices
-const result = await prices.lookup({
-  productNumbers: ['SH005-BLK-10'],
-  priceListKeys: ['RETAIL'],
-  currencyCode: 'SEK',
+// Look up a completed order by its order or delivery reference and e-mail
+const result = await orders.lookup({
+  reference: 'ORDER-12345',
+  email: 'customer@example.com',
 })
 
 // Cancel the order created from a completed cart

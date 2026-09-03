@@ -1,6 +1,6 @@
 # @hantera/storefront-sdk
 
-TypeScript SDK for building storefronts on the Hantera platform. Provides a tree-shakeable cart and checkout client.
+TypeScript SDK for building storefronts on the Hantera platform. Provides tree-shakeable cart, checkout, and customer order lookup clients.
 
 ## Installation
 
@@ -31,6 +31,7 @@ await cart.addItem(cartId, { productNumber: 'PROD-001', quantity: 1 })
 | --------------------------------- | -------------------------------------------- |
 | `@hantera/storefront-sdk`         | Re-exports the cart module                   |
 | `@hantera/storefront-sdk/cart`    | Cart & checkout client with SSE subscriptions |
+| `@hantera/storefront-sdk/orders`  | Customer self-service order lookup client     |
 
 ## Conversion Tracking
 
