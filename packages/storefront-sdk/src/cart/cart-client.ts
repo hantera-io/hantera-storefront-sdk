@@ -123,6 +123,16 @@ export class CartClient {
     return response
   }
 
+  async setNotes(cartId: string, notes: string): Promise<CartMutationResponse> {
+    const response = await this.http.request<CartMutationResponse>(
+      'POST',
+      `/ingress/commerce/carts/${cartId}/notes`,
+      { notes },
+    )
+    this.notifyUpdate(cartId, response)
+    return response
+  }
+
   async setField(cartId: string, key: string, request: SetFieldRequest): Promise<CartMutationResponse> {
     const response = await this.http.request<CartMutationResponse>(
       'POST',

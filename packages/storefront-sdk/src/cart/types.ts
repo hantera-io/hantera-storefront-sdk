@@ -51,6 +51,8 @@ export interface Cart {
   shippingTax: number
   email?: string
   phone?: string
+  /** Customer note forwarded to the order's native notes field on completion. */
+  notes?: string | null
   promotions: [{
     calculatedTotal: number,
     description: string,
