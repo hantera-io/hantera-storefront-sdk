@@ -1,72 +1,23 @@
 # Orders API Reference
 
-## `createOrdersClient(options)`
+`createOrdersClient({ baseUrl, getCustomerToken })` requires a callback that returns the current customer token, synchronously or asynchronously. The callback is invoked on each request; the host handles renewal.
 
-Creates an `OrdersClient` for customer self-service order lookup.
+For the server-side OAuth client-credentials request and customer-token mint, see [Customer Tokens](/orders/customer-tokens).
 
 ```ts
-import { createOrdersClient } from '@hantera/storefront-sdk/orders'
+import { createOrdersClient, isOrderLookupError } from '@hantera/storefront-sdk/orders'
 
 const orders = createOrdersClient({
   baseUrl: 'https://core.your-instance.hantera.cloud',
-})
-```
-
-### Options
-
-| Property | Type | Required | Description |
-| --- | --- | --- | --- |
-| `baseUrl` | `string` | Yes | Base URL of the Hantera instance |
-
----
-
-## `lookup(request)`
-
-Looks up a customer-facing order representation by a live cart number, order number, or delivery number and a matching e-mail address.
-
-```ts
-const result = await orders.lookup({
-  reference: 'ORDER-12345',
-  email: 'customer@example.com',
+  getCustomerToken: () => getTokenFromYourBackend(),
 })
 
-if (isOrderLookupError(result)) {
-  console.error(result.error.code, result.error.message)
-  return
-}
-
-console.log(result.orderNumber)
-console.log(result.items)
+const found = await orders.lookup({ reference: 'ORDER-12345' })
+const history = await orders.search({ customerNumber: 'CUST-1' })
+if (isOrderLookupError(found)) console.error(found.error.message)
+if (isOrderLookupError(history)) console.error(history.error.message)
 ```
 
-### Request
+`lookup` accepts an order or delivery reference. `search` returns at most 50 newest orders. Both accept an optional `customerNumber` to narrow the token's scope; omitting it uses all scoped accounts. A number outside the scope returns `FORBIDDEN`. Unknown and out-of-scope orders return `ORDER_NOT_FOUND`.
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `reference` | `string` | Yes | Live cart number, order number, or delivery number |
-| `email` | `string` | Yes | E-mail associated with the cart or order |
-
-### Returns
-
-`Promise<OrderLookupResponse>` — either `OrderLookup` or `OrderLookupError`.
-
-Use `isOrderLookupError(result)` to narrow the result.
-
-| Error code | Meaning |
-| --- | --- |
-| `ORDER_NOT_FOUND` | The reference was not found or the supplied e-mail does not match. These cases are intentionally indistinguishable. |
-| `INVALID_REQUEST` | `reference` or `email` was blank. |
-
-### `OrderLookup`
-
-The response contains order totals, taxes, shipping, customer contact information, promotions, payments, custom fields, and order items.
-
-| Property | Notes |
-| --- | --- |
-| `orderId`, `orderNumber` | Durable order identity. |
-| `items` | Product lines with quantity, prices, totals, tax, discount, and optionally `deliveryNumber`. |
-| `cartId`, `cartNumber`, `profileKey` | Present only when Commerce can render a live originating cart. Do not use them as durable order identifiers. |
-| `invoiceRecipient`, `address` | Customer addresses when supplied by the order/cart. |
-| `promotions`, `payments` | Applied promotion and payment summaries. |
-
-Cart numbers stop resolving after cart deletion. For completed historical orders, store or display the `orderNumber` and delivery numbers instead.
+The Storefront app must be installed, and each order needs `customerNumber`. The response is order-based, with order state, deliveries, lines, amounts, promotions and payments; it does not contain cart identity or support cart references. The POC token flow is not suitable for production data.

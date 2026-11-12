@@ -1,6 +1,10 @@
 export interface OrderLookupRequest {
   reference: string
-  email: string
+  customerNumber?: string
+}
+
+export interface OrderSearchRequest {
+  customerNumber?: string
 }
 
 export interface OrderLookupAddress {
@@ -18,64 +22,55 @@ export interface OrderLookupAddress {
 }
 
 export interface OrderLookupItem {
-  cartItemId?: string
+  orderLineNumber: string
   productNumber: string
-  description?: string
-  image?: string
+  description: string | null
+  image: string | null
   quantity: number
+  returnedQuantity: number
   reservedQuantity: number
   unitPrice: number
   total: number
   tax: number
   discount: number
-  deliveryNumber?: string
+  deliveryNumber: string
 }
 
 export interface OrderLookupPromotion {
   calculatedTotal: number
   description: string
-  messageRendered?: string
-  messageTemplate?: string
-  messageType?: string
+  messageRendered: string | null
+  messageTemplate: string | null
+  messageType: string | null
 }
 
 export interface OrderLookupPayment {
-  reference?: string
-  provider?: string
+  reference: string | null
+  provider: string | null
   amount: number
 }
 
-/**
- * Customer-facing representation returned by the public Commerce order lookup.
- * Cart properties are absent when the originating cart has been deleted or the
- * order was created outside Commerce.
- */
 export interface OrderLookup {
-  cartId?: string
-  cartNumber?: string
-  cartState?: string
-  profileKey?: string
   orderId: string
   orderNumber: string
-  channelKey?: string
+  orderState: string
+  createdAt: string
+  channelKey: string | null
   currencyCode: string
   taxIncluded: boolean
-  coupons: string[]
-  invalidCoupons: string[]
   productTotal: number
   orderTotal: number
   orderTaxTotal: number
   shippingDiscount: number
   shippingTotal: number
   shippingTax: number
-  locale?: string
-  email?: string
-  phone?: string
-  address?: OrderLookupAddress
-  invoiceRecipient?: OrderLookupAddress
+  locale: string | null
+  address: OrderLookupAddress | null
+  invoiceRecipient: OrderLookupAddress | null
   promotions: OrderLookupPromotion[]
   payments: OrderLookupPayment[]
-  fields: Record<string, unknown>
+  itemCount: number
+  deliveries: { deliveryNumber: string; deliveryState: string }[]
   items: OrderLookupItem[]
 }
 
@@ -87,12 +82,14 @@ export interface OrderLookupError {
 }
 
 export type OrderLookupResponse = OrderLookup | OrderLookupError
+export type OrderSearchResponse = { orders: OrderLookup[] } | OrderLookupError
 
 export function isOrderLookupError(response: unknown): response is OrderLookupError {
   return (
     response != null &&
     typeof response === 'object' &&
     'error' in response &&
+    (response as { error?: unknown }).error != null &&
     typeof (response as { error?: unknown }).error === 'object'
   )
 }

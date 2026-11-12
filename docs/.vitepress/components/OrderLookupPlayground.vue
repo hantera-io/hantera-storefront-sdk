@@ -8,14 +8,14 @@ const STORAGE_KEY_CONFIG = 'hantera-sdk-playground-config'
 
 const tenant = ref(loadTenant())
 const reference = ref('')
-const email = ref('')
+const customerToken = ref('')
 const loading = ref(false)
 const result = ref<OrderLookup | null>(null)
 const error = ref<OrderLookupError['error'] | null>(null)
 const requestError = ref<string | null>(null)
 
 const baseUrl = computed(() => resolveBaseUrl(tenant.value))
-const client = computed(() => createOrdersClient({ baseUrl: baseUrl.value }))
+const client = computed(() => createOrdersClient({ baseUrl: baseUrl.value, getCustomerToken: () => customerToken.value.trim() }))
 
 function loadTenant(): string {
   try {
@@ -34,8 +34,8 @@ function saveTenant() {
 }
 
 async function lookup() {
-  if (!tenant.value.trim() || !reference.value.trim() || !email.value.trim()) {
-    requestError.value = 'Enter a tenant, reference, and e-mail address.'
+  if (!tenant.value.trim() || !reference.value.trim() || !customerToken.value.trim()) {
+    requestError.value = 'Enter a tenant, reference, and customer token.'
     return
   }
 
@@ -48,7 +48,6 @@ async function lookup() {
   try {
     const response = await client.value.lookup({
       reference: reference.value.trim(),
-      email: email.value.trim(),
     })
 
     if (isOrderLookupError(response)) {
@@ -81,11 +80,11 @@ function formatCurrency(value: number): string {
       </label>
       <label>
         Reference
-        <input v-model="reference" type="text" placeholder="Order, delivery, or live cart number" />
+        <input v-model="reference" type="text" placeholder="Order or delivery number" />
       </label>
       <label>
-        E-mail
-        <input v-model="email" type="email" placeholder="customer@example.com" />
+        Customer token
+        <input v-model="customerToken" type="password" autocomplete="off" />
       </label>
       <button class="btn-primary" :disabled="loading" type="submit">
         {{ loading ? 'Looking up…' : 'Look up order' }}
@@ -100,7 +99,7 @@ function formatCurrency(value: number): string {
       <header>
         <div>
           <h3>{{ result.orderNumber }}</h3>
-          <p v-if="result.email">{{ result.email }}</p>
+          <p>{{ result.orderState }}</p>
         </div>
         <strong>{{ formatCurrency(result.orderTotal) }}</strong>
       </header>

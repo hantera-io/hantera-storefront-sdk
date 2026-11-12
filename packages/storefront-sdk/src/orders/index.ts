@@ -10,4 +10,6 @@ export type {
   OrderLookupPromotion,
   OrderLookupRequest,
   OrderLookupResponse,
+  OrderSearchRequest,
+  OrderSearchResponse,
 } from './types'

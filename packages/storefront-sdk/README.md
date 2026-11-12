@@ -19,6 +19,7 @@ const cart = createCartClient({
 
 const orders = createOrdersClient({
   baseUrl: 'https://core.your-instance.hantera.cloud',
+  getCustomerToken: () => getTokenFromYourBackend(),
 })
 
 // Create a cart
@@ -33,10 +34,9 @@ await cart.addItem(cartId, {
   quantity: 1,
 })
 
-// Look up a completed order by its order or delivery reference and e-mail
+// Look up an order for the customer authenticated by your backend
 const result = await orders.lookup({
   reference: 'ORDER-12345',
-  email: 'customer@example.com',
 })
 
 // Cancel the order created from a completed cart

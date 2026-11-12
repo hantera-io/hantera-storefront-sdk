@@ -54,6 +54,7 @@ export default defineConfig({
         text: 'Orders Module',
         items: [
           { text: 'Overview', link: '/orders/' },
+          { text: 'Customer Tokens', link: '/orders/customer-tokens' },
           { text: 'API Reference', link: '/orders/api' },
         ],
       },

@@ -9,12 +9,13 @@ export class HttpClient {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '')
   }
 
-  async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async request<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
     const url = `${this.baseUrl}${path}`
     const options: RequestInit = {
       method,
       headers: {
         'Content-Type': 'application/json',
+        ...headers,
       },
     }
 
