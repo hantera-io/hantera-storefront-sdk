@@ -4,4 +4,4 @@ The orders client reads customer-scoped orders from `apps.storefront`, independe
 
 Pass a `getCustomerToken` callback to `createOrdersClient`, then use `search` or `lookup`. The callback may cache the token and renew it before expiry. See [Customer Tokens](/orders/customer-tokens) for the server-side OAuth and mint flow, and the [API reference](/orders/api) for client methods.
 
-The current implementation is a proof of concept: registry-stored signing keys and the public demo issuer are intended only for isolated test tenants with synthetic data. Tokens are signed, not encrypted, and do not make their payload private.
+Customer tokens are signed, not encrypted, and do not make their payload private.

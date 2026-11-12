@@ -12,6 +12,7 @@ export default defineConfig({
       alias: {
         '@hantera/storefront-sdk/cart': path.join(sdkSrc, 'cart/index.ts'),
         '@hantera/storefront-sdk/orders': path.join(sdkSrc, 'orders/index.ts'),
+        '@hantera/storefront-sdk/returns': path.join(sdkSrc, 'returns/index.ts'),
         '@hantera/storefront-sdk': path.join(sdkSrc, 'index.ts'),
       },
     },
@@ -21,6 +22,7 @@ export default defineConfig({
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Cart', link: '/cart/' },
       { text: 'Orders', link: '/orders/' },
+      { text: 'Returns', link: '/returns/api' },
       { text: 'Checkout', link: '/checkout/' },
       { text: 'Tracking', link: '/tracking/' },
       { text: 'Playground', link: '/playground/cart' },
@@ -57,6 +59,10 @@ export default defineConfig({
           { text: 'Customer Tokens', link: '/orders/customer-tokens' },
           { text: 'API Reference', link: '/orders/api' },
         ],
+      },
+      {
+        text: 'Returns Module',
+        items: [{ text: 'API Reference', link: '/returns/api' }],
       },
       {
         text: 'Tracking',

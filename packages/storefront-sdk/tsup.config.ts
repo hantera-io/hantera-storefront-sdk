@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     'cart/index': 'src/cart/index.ts',
     'orders/index': 'src/orders/index.ts',
+    'returns/index': 'src/returns/index.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

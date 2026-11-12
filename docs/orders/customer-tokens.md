@@ -2,10 +2,6 @@
 
 The Orders client needs a **customer token** identifying the Hantera customer numbers whose orders it may read. The SDK does not authenticate shoppers or mint these tokens. A trusted backend authenticates the shopper, determines which customer numbers they may access, and asks Hantera's Storefront app to mint a token for that scope.
 
-::: danger Proof of concept only
-The current Storefront app stores signing keys in ordinary, readable registry values. The public demo issuer can mint tokens for arbitrary customer numbers. Use this flow only on isolated test tenants with synthetic data; it is not a production security boundary. Do not install the demo issuer on a tenant with real customer data.
-:::
-
 There are two different credentials in this flow:
 
 1. A **Hantera OAuth access token** authorizes your backend to call the private mint ingress. Never expose this token or the OAuth client secret to the browser.

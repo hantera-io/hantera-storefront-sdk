@@ -20,4 +20,4 @@ if (isOrderLookupError(history)) console.error(history.error.message)
 
 `lookup` accepts an order or delivery reference. `search` returns at most 50 newest orders. Both accept an optional `customerNumber` to narrow the token's scope; omitting it uses all scoped accounts. A number outside the scope returns `FORBIDDEN`. Unknown and out-of-scope orders return `ORDER_NOT_FOUND`.
 
-The Storefront app must be installed, and each order needs `customerNumber`. The response is order-based, with order state, deliveries, lines, amounts, promotions and payments; it does not contain cart identity or support cart references. The POC token flow is not suitable for production data.
+The Storefront app must be installed, and each order needs `customerNumber`. The response is order-based, with order state, deliveries, lines, amounts, promotions and payments; it does not contain cart identity or support cart references.

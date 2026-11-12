@@ -1,6 +1,6 @@
 # @hantera/storefront-sdk
 
-Cart, checkout, and customer order lookup for headless storefronts powered by [Hantera](https://www.hantera.io).
+Cart, checkout, customer orders and Returns clients for headless storefronts powered by [Hantera](https://www.hantera.io).
 
 ## Installation
 
@@ -47,6 +47,10 @@ await cart.cancelOrder(cartId)
 ## Documentation
 
 Full documentation, configuration guides, and API reference at **[storefront.hantera.dev](https://storefront.hantera.dev)**.
+
+The optional `@hantera/storefront-sdk/returns` entry provides customer-token-scoped claim lookup and SSE
+subscriptions. It also wraps the separately authorized order-number-and-email reason eligibility and claim
+creation endpoints. See the [Returns API](https://storefront.hantera.dev/returns/api) for the different security boundaries.
 
 ## License
 
