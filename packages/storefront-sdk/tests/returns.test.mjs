@@ -56,30 +56,32 @@ test('lookup rejects structured errors', async () => {
   await assert.rejects(client.lookupClaims('O1'), error => error instanceof ReturnsError && error.code === 'UNAUTHORIZED' && error.status === 401)
 })
 
-test('stream parses fragmented events with authorization and rejects disconnect', async () => {
+test('customer stream parses fragmented updates with authorization and rejects disconnect', async () => {
   globalThis.fetch = async (url, options) => {
     assert.equal(url, 'https://example.com/ingress/returns/storefront/claims/events')
     assert.equal(options.headers.Authorization, 'Bearer valid')
     assert.equal(options.headers.Accept, 'text/event-stream')
-    assert.deepEqual(JSON.parse(options.body), { orderNumber: 'O1' })
+    assert.equal(options.body, undefined)
     const encoder = new TextEncoder()
     return new Response(new ReadableStream({ start(controller) {
-      for (const text of ['event: rea', 'dy\r\ndata: {}\r\n\r\n:ping\n\n', 'event: updated\ndata: {}\n\n']) controller.enqueue(encoder.encode(text))
+      for (const text of ['event: rea', 'dy\r\ndata: {"connected":true}\r\n\r\n:ping\n\n', 'event: updated\ndata: {"orderNumber":"O1","claimNumber":"CLM1"}\n\n']) controller.enqueue(encoder.encode(text))
       controller.close()
     } }), { headers: { 'content-type': 'text/event-stream' } })
   }
   const client = createReturnsClient({ baseUrl: 'https://example.com', getCustomerToken: () => 'valid' })
-  let updates = 0
-  await assert.rejects(client.streamClaims('O1', new AbortController().signal, () => updates++), error => error.code === 'STREAM_CLOSED')
-  assert.equal(updates, 2)
+  const updates = []
+  await assert.rejects(client.streamCustomerClaims(new AbortController().signal, update => updates.push(update)), error => error.code === 'STREAM_CLOSED')
+  assert.deepEqual(updates, [{ orderNumber: 'O1', claimNumber: 'CLM1' }])
 })
 
-test('stream rejects invalid content and server error events', async () => {
+test('customer stream rejects invalid content, malformed updates and server error events', async () => {
   const client = createReturnsClient({ baseUrl: 'https://example.com', getCustomerToken: () => 'valid' })
   globalThis.fetch = async () => Response.json({})
-  await assert.rejects(client.streamClaims('O1', new AbortController().signal, () => assert.fail()), error => error.code === 'INVALID_STREAM')
+  await assert.rejects(client.streamCustomerClaims(new AbortController().signal, () => assert.fail()), error => error.code === 'INVALID_STREAM')
+  globalThis.fetch = async () => new Response('event: updated\ndata: {"orderNumber":"O1"}\n\n', { headers: { 'content-type': 'text/event-stream' } })
+  await assert.rejects(client.streamCustomerClaims(new AbortController().signal, () => assert.fail()), error => error.code === 'INVALID_STREAM')
   globalThis.fetch = async () => new Response('event: error\ndata: {"code":"UNAUTHORIZED","message":"Expired"}\n\n', { headers: { 'content-type': 'text/event-stream' } })
-  await assert.rejects(client.streamClaims('O1', new AbortController().signal, () => assert.fail()), error => error.code === 'UNAUTHORIZED')
+  await assert.rejects(client.streamCustomerClaims(new AbortController().signal, () => assert.fail()), error => error.code === 'UNAUTHORIZED')
 })
 
 test('subscription cancellation aborts active stream and prevents reconnect', async () => {
@@ -93,7 +95,7 @@ test('subscription cancellation aborts active stream and prevents reconnect', as
     } }), { headers: { 'content-type': 'text/event-stream' } })
   }
   const client = createReturnsClient({ baseUrl: 'https://example.com', getCustomerToken: () => 'valid' })
-  const cancel = client.subscribeClaims('O1', () => assert.fail())
+  const cancel = client.subscribeCustomerClaims(() => assert.fail())
   await new Promise(resolve => setTimeout(resolve, 20))
   cancel()
   await new Promise(resolve => setTimeout(resolve, 20))
@@ -118,7 +120,7 @@ test('subscription obtains a fresh token after a stream disconnect', async () =>
     return new Response('', { headers: { 'content-type': 'text/event-stream' } })
   }
   const client = createReturnsClient({ baseUrl: 'https://example.com', getCustomerToken: () => `token-${++n}` })
-  stop = client.subscribeClaims('O1', () => {})
+  stop = client.subscribeCustomerClaims(() => {})
   try {
     await Promise.race([reconnected, new Promise((_, reject) => setTimeout(() => reject(new Error('No reconnect')), 7000))])
     assert.deepEqual(tokens, ['Bearer token-1', 'Bearer token-2'])

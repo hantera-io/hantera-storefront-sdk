@@ -1,5 +1,5 @@
 import { HttpClient, type HttpClientOptions } from '../common/http-client'
-import type { ClaimCreateRequest, ClaimCreateResponse, ClaimsResponse, ClaimMessagesPage, CustomerClaimMessage, SendClaimMessageRequest, ExchangeProductSearchRequest, ExchangeProductSearchResponse, ReasonEligibilityRequest, ReasonEligibilityResponse, ReturnShippingOptionsResponse, WithdrawalAvailabilityResponse, WithdrawalCreateRequest } from './types'
+import type { ClaimCreateRequest, ClaimCreateResponse, ClaimMessagesPage, ClaimUpdate, ClaimsResponse, CustomerClaimMessage, SendClaimMessageRequest, ExchangeProductSearchRequest, ExchangeProductSearchResponse, ReasonEligibilityRequest, ReasonEligibilityResponse, ReturnShippingOptionsResponse, WithdrawalAvailabilityResponse, WithdrawalCreateRequest } from './types'
 
 export interface ReturnsClientOptions extends HttpClientOptions {
   getCustomerToken: () => string | Promise<string>
@@ -118,13 +118,12 @@ export class ReturnsClient {
     return response.json() as Promise<ClaimCreateResponse>
   }
 
-  async streamClaims(orderNumber: string, signal: AbortSignal, onChange: () => void): Promise<void> {
+  async streamCustomerClaims(signal: AbortSignal, onUpdate: (update: ClaimUpdate) => void): Promise<void> {
     const token = await this.getCustomerToken()
     signal.throwIfAborted()
     const response = await fetch(`${this.http.getBaseUrl()}/ingress/returns/storefront/claims/events`, {
       method: 'POST', signal,
-      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ orderNumber }),
+      headers: { Accept: 'text/event-stream', Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw await responseError(response)
     if (!response.headers.get('content-type')?.includes('text/event-stream') || !response.body) {
@@ -153,7 +152,12 @@ export class ReturnsClient {
               try { detail = JSON.parse(data.join('\n')) ?? {} } catch { detail = {} }
               throw new ReturnsError(typeof detail.message === 'string' ? detail.message : 'Claim updates are unavailable', typeof detail.code === 'string' ? detail.code : 'STREAM_ERROR', 0)
             }
-            if (event === 'ready' || event === 'updated') onChange()
+            if (event === 'updated') {
+              let detail: { orderNumber?: unknown; claimNumber?: unknown } = {}
+              try { detail = JSON.parse(data.join('\n')) ?? {} } catch { detail = {} }
+              if (typeof detail.orderNumber !== 'string' || typeof detail.claimNumber !== 'string') throw new ReturnsError('Invalid claim update', 'INVALID_STREAM', 0)
+              onUpdate({ orderNumber: detail.orderNumber, claimNumber: detail.claimNumber })
+            }
             event = 'message'
             data = []
             size = 0
@@ -175,7 +179,7 @@ export class ReturnsClient {
     if (!signal.aborted) throw new ReturnsError('Claim updates disconnected', 'STREAM_CLOSED', 0)
   }
 
-  subscribeClaims(orderNumber: string, onChange: () => void, onError: (error: unknown) => void = () => {}): () => void {
+  subscribeCustomerClaims(onUpdate: (update: ClaimUpdate) => void, onError: (error: unknown) => void = () => {}): () => void {
     const controller = new AbortController()
     let stream: AbortController | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -183,8 +187,10 @@ export class ReturnsClient {
       if (controller.signal.aborted) return
       stream = new AbortController()
       const current = stream
-      const refresh = setTimeout(() => current.abort(), 15000)
-      try { await this.streamClaims(orderNumber, current.signal, onChange) }
+      // The stream is long-lived; renew well before the token's 30-minute
+      // lifetime so each reconnection mints a fresh token.
+      const refresh = setTimeout(() => current.abort(), 25 * 60 * 1000)
+      try { await this.streamCustomerClaims(current.signal, onUpdate) }
       catch (error) { if (!controller.signal.aborted && !current.signal.aborted) onError(error) }
       finally {
         clearTimeout(refresh)

@@ -28,6 +28,11 @@ export interface ClaimsResponse {
   claims: CustomerClaim[]
 }
 
+export interface ClaimUpdate {
+  orderNumber: string
+  claimNumber: string
+}
+
 export interface CustomerClaimMessage {
   id: string
   createdAt: string
