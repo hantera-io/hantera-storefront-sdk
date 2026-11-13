@@ -5,6 +5,35 @@ import { createReturnsClient, ReturnsError } from '../dist/returns/index.js'
 const originalFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = originalFetch })
 
+test('messages paginate and send with scoped tokens and stable message identity', async () => {
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    const body = JSON.parse(options.body)
+    calls.push({url, options, body})
+    if (url.endsWith('/lookup')) return Response.json(body.after
+      ? {messages: [{id: '2', author: 'operator', body: 'Reply', createdAt: '2026-01-02'}], nextCursor: null}
+      : {messages: [{id: '1', author: 'customer', body: 'Hello', createdAt: '2026-01-01'}], nextCursor: 'cursor'})
+    return Response.json({sent: true, messageId: body.messageId})
+  }
+  const client = createReturnsClient({baseUrl: 'https://example.com', getCustomerToken: () => 'valid'})
+  assert.deepEqual((await client.getAllClaimMessages('O1', 'CLM1')).map(message => message.id), ['1', '2'])
+  assert.equal(calls[1].body.after, 'cursor')
+  const request = {orderNumber: 'O1', claimNumber: 'CLM1', messageId: 'stable-id', body: 'Hello'}
+  assert.deepEqual(await client.sendClaimMessage(request), {sent: true, messageId: 'stable-id'})
+  assert.deepEqual(calls[2].body, request)
+  assert.ok(calls.every(call => call.options.headers.Authorization === 'Bearer valid'))
+})
+
+test('message pagination and send fail closed on malformed responses', async () => {
+  const client = createReturnsClient({baseUrl: 'https://example.com', getCustomerToken: () => 'valid'})
+  globalThis.fetch = async () => Response.json({messages: [], nextCursor: 'same'})
+  await assert.rejects(client.getAllClaimMessages('O1', 'CLM1'), error => error.code === 'INVALID_CURSOR')
+  globalThis.fetch = async () => Response.json({messages: []})
+  await assert.rejects(client.getAllClaimMessages('O1', 'CLM1'), error => error.code === 'INVALID_MESSAGE_PAGE')
+  globalThis.fetch = async () => Response.json({sent: true, messageId: 'other'})
+  await assert.rejects(client.sendClaimMessage({orderNumber: 'O1', claimNumber: 'CLM1', messageId: 'id', body: 'hello'}), error => error.code === 'MESSAGE_NOT_CONFIRMED')
+})
+
 test('lookup sends fresh bearer tokens without email', async () => {
   const requests = []
   globalThis.fetch = async (url, options) => {
@@ -113,11 +142,48 @@ test('registration endpoints retain their separate order and email contract', as
   const client = createReturnsClient({ baseUrl: 'https://example.com', getCustomerToken: () => assert.fail() })
   const request = { orderNumber: 'O1', email: 'test@example.com', orderLineNumber: 'L1' }
   await client.reasonEligibility(request)
-  await client.createClaim({ orderNumber: 'O1', email: request.email, lines: [] })
+  await client.createClaim({ orderNumber: 'O1', email: request.email, comment: 'A question', lines: [] })
   assert.match(calls[0].url, /reason-eligibility$/)
   assert.deepEqual(JSON.parse(calls[0].options.body), request)
   assert.equal(calls[0].options.headers.Authorization, undefined)
   assert.match(calls[1].url, /claims$/)
+  assert.equal(calls[1].options.headers, undefined)
+  assert.deepEqual(JSON.parse(calls[1].options.body.get('request')), {orderNumber: 'O1', email: request.email, comment: 'A question', lines: []})
+  assert.equal(calls[1].options.body.getAll('pictures').length, 0)
+})
+
+test('withdrawal discovery and submission use their own public contracts', async () => {
+  const calls = []
+  globalThis.fetch = async (url, options) => { calls.push({url, options}); return Response.json({}) }
+  const client = createReturnsClient({baseUrl: 'https://example.com', getCustomerToken: () => assert.fail()})
+  const controller = new AbortController()
+  await client.withdrawalAvailability('O1', 'test@example.com', controller.signal)
+  await client.createWithdrawal({orderNumber: 'O1', email: 'test@example.com', returnShippingOptionKey: 'post'}, controller.signal)
+  assert.match(calls[0].url, /withdrawal-availability$/)
+  assert.deepEqual(JSON.parse(calls[0].options.body), {orderNumber: 'O1', email: 'test@example.com'})
+  assert.match(calls[1].url, /withdrawals$/)
+  assert.deepEqual(JSON.parse(calls[1].options.body), {orderNumber: 'O1', email: 'test@example.com', returnShippingOptionKey: 'post'})
+  assert.equal(calls[1].options.signal, controller.signal)
+})
+
+test('picture claims send one multipart request with per-line file indexes', async () => {
+  let request
+  globalThis.fetch = async (url, options) => { request = {url, options}; return Response.json({claimNumber: 'CLM1'}) }
+  const client = createReturnsClient({baseUrl: 'https://example.com', getCustomerToken: () => assert.fail()})
+  const first = new File(['a'], 'first.png', {type: 'image/png'})
+  const second = new File(['b'], 'second.jpg', {type: 'image/jpeg'})
+  await client.createClaim({orderNumber: 'O1', email: 'a@example.com', comment: 'Question', lines: [
+    {orderLineNumber: 'L1', quantity: 1, reason: 'damaged', pictures: [first, second]},
+    {orderLineNumber: 'L2', quantity: 1, reason: 'other'},
+  ]})
+  assert.match(request.url, /claims$/)
+  assert.equal(request.options.headers, undefined)
+  const payload = JSON.parse(request.options.body.get('request'))
+  assert.equal(payload.comment, 'Question')
+  assert.deepEqual(payload.lines[0].pictureIndexes, [1, 2])
+  assert.equal('pictures' in payload.lines[0], false)
+  assert.equal('pictureIndexes' in payload.lines[1], false)
+  assert.equal(request.options.body.getAll('pictures').length, 2)
 })
 
 test('submission-disabled responses are surfaced to the caller', async () => {
@@ -129,12 +195,14 @@ test('submission-disabled responses are surfaced to the caller', async () => {
 
 test('exchange search and shipping options use the public registration contract', async () => {
   const calls = []
-  globalThis.fetch = async (url, options) => { calls.push({ url, options }); return Response.json({ products: [], incomplete: true, options: [] }) }
+  globalThis.fetch = async (url, options) => { calls.push({ url, options }); return Response.json({ products: [], hasMore: null, options: [] }) }
   const client = createReturnsClient({ baseUrl: 'https://example.com', getCustomerToken: () => assert.fail() })
   const request = { orderNumber: 'O1', email: 'test@example.com', orderLineNumber: 'L1', reason: 'wrongSize', phrase: 'coat', locale: 'en' }
-  assert.deepEqual((await client.searchExchangeProducts(request)).products, [])
+  assert.deepEqual(await client.searchExchangeProducts(request), { products: [], hasMore: null, options: [] })
   assert.deepEqual(JSON.parse(calls[0].options.body), request)
   assert.match(calls[0].url, /exchange-products\/search$/)
+  await client.searchExchangeProducts({ orderNumber: 'O1', email: request.email, orderLineNumber: 'L1', reason: 'wrongSize', locale: 'en' })
+  assert.equal('phrase' in JSON.parse(calls[1].options.body), false)
   await client.returnShippingOptions('O1', 'test@example.com')
-  assert.equal(calls[1].url, 'https://example.com/ingress/returns/storefront/return-shipping-options?orderNumber=O1&email=test%40example.com')
+  assert.equal(calls[2].url, 'https://example.com/ingress/returns/storefront/return-shipping-options?orderNumber=O1&email=test%40example.com')
 })

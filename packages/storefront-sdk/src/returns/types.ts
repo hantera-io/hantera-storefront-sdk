@@ -28,6 +28,25 @@ export interface ClaimsResponse {
   claims: CustomerClaim[]
 }
 
+export interface CustomerClaimMessage {
+  id: string
+  createdAt: string
+  author: 'customer' | 'operator'
+  body: string
+}
+
+export interface ClaimMessagesPage {
+  messages: CustomerClaimMessage[]
+  nextCursor: string | null
+}
+
+export interface SendClaimMessageRequest {
+  orderNumber: string
+  claimNumber: string
+  messageId: string
+  body: string
+}
+
 export interface ReasonEligibilityRequest {
   orderNumber: string
   email: string
@@ -38,7 +57,8 @@ export interface ReasonEligibilityResponse {
   orderNumber: string
   orderLineNumber: string
   claimableQuantity: number
-  reasons: { reason: string; label: string; resolutions: string[] }[]
+  reasons: { reason: string; label: string; resolutions: string[]; pictureRequired: boolean; claimTypes: string[] }[]
+  claimTypes: { key: string; label: string; description?: string | null }[]
 }
 
 export interface ClaimCreateRequest {
@@ -47,7 +67,7 @@ export interface ClaimCreateRequest {
   claimType?: string
   comment?: string
   returnShippingOptionKey?: string
-  lines: { orderLineNumber: string; quantity: number; reason: string; resolution?: string; exchangeProductNumber?: string; description?: string; metadata?: Record<string, unknown> }[]
+  lines: { orderLineNumber: string; quantity: number; reason: string; resolution?: string; exchangeProductNumber?: string; description?: string; metadata?: Record<string, unknown>; pictures?: File[] }[]
 }
 
 export interface ExchangeProductSearchRequest extends ReasonEligibilityRequest {
@@ -72,4 +92,16 @@ export interface ClaimCreateResponse {
   orderNumber: string
   claimType: string | null
   lineCount: number
+}
+
+export interface WithdrawalAvailabilityResponse {
+  orderNumber: string
+  available: boolean
+  lines: { orderLineNumber: string; quantity: number }[]
+}
+
+export interface WithdrawalCreateRequest {
+  orderNumber: string
+  email: string
+  returnShippingOptionKey?: string
 }

@@ -1,5 +1,5 @@
 import { HttpClient, type HttpClientOptions } from '../common/http-client'
-import type { ClaimCreateRequest, ClaimCreateResponse, ClaimsResponse, ExchangeProductSearchRequest, ExchangeProductSearchResponse, ReasonEligibilityRequest, ReasonEligibilityResponse, ReturnShippingOptionsResponse } from './types'
+import type { ClaimCreateRequest, ClaimCreateResponse, ClaimsResponse, ClaimMessagesPage, CustomerClaimMessage, SendClaimMessageRequest, ExchangeProductSearchRequest, ExchangeProductSearchResponse, ReasonEligibilityRequest, ReasonEligibilityResponse, ReturnShippingOptionsResponse, WithdrawalAvailabilityResponse, WithdrawalCreateRequest } from './types'
 
 export interface ReturnsClientOptions extends HttpClientOptions {
   getCustomerToken: () => string | Promise<string>
@@ -47,8 +47,43 @@ export class ReturnsClient {
     return this.post('/ingress/returns/storefront/claims/lookup', { orderNumber }, signal, true)
   }
 
+  lookupClaimMessages(orderNumber: string, claimNumber: string, after?: string, signal?: AbortSignal): Promise<ClaimMessagesPage> {
+    return this.post('/ingress/returns/storefront/claims/messages/lookup', {orderNumber, claimNumber, after}, signal, true)
+  }
+
+  async getAllClaimMessages(orderNumber: string, claimNumber: string, signal?: AbortSignal): Promise<CustomerClaimMessage[]> {
+    const messages: CustomerClaimMessage[] = []
+    const seen = new Set<string>()
+    let after: string | undefined
+    do {
+      const page = await this.lookupClaimMessages(orderNumber, claimNumber, after, signal)
+      if (!Array.isArray(page.messages) || page.messages.length > 100 || (page.nextCursor !== null && typeof page.nextCursor !== 'string') || page.nextCursor === '') {
+        throw new ReturnsError('Invalid message page', 'INVALID_MESSAGE_PAGE', 0)
+      }
+      messages.push(...page.messages)
+      after = page.nextCursor ?? undefined
+      if (after && seen.has(after)) throw new ReturnsError('Message pagination did not advance', 'INVALID_CURSOR', 0)
+      if (after) seen.add(after)
+    } while (after)
+    return messages
+  }
+
+  async sendClaimMessage(request: SendClaimMessageRequest, signal?: AbortSignal): Promise<{sent: true, messageId: string}> {
+    const result = await this.post<{sent?: boolean, messageId?: string}>('/ingress/returns/storefront/claims/messages', request, signal, true)
+    if (result.sent !== true || result.messageId !== request.messageId) throw new ReturnsError('Message was not confirmed', 'MESSAGE_NOT_CONFIRMED', 0)
+    return {sent: true, messageId: result.messageId}
+  }
+
   reasonEligibility(request: ReasonEligibilityRequest, signal?: AbortSignal): Promise<ReasonEligibilityResponse> {
     return this.post('/ingress/returns/storefront/reason-eligibility', request, signal)
+  }
+
+  withdrawalAvailability(orderNumber: string, email: string, signal?: AbortSignal): Promise<WithdrawalAvailabilityResponse> {
+    return this.post('/ingress/returns/storefront/withdrawal-availability', { orderNumber, email }, signal)
+  }
+
+  createWithdrawal(request: WithdrawalCreateRequest, signal?: AbortSignal): Promise<ClaimCreateResponse> {
+    return this.post('/ingress/returns/storefront/withdrawals', request, signal)
   }
 
   searchExchangeProducts(request: ExchangeProductSearchRequest, signal?: AbortSignal): Promise<ExchangeProductSearchResponse> {
@@ -62,8 +97,25 @@ export class ReturnsClient {
     return response.json() as Promise<ReturnShippingOptionsResponse>
   }
 
-  createClaim(request: ClaimCreateRequest, signal?: AbortSignal): Promise<ClaimCreateResponse> {
-    return this.post('/ingress/returns/storefront/claims', request, signal)
+  async createClaim(request: ClaimCreateRequest, signal?: AbortSignal): Promise<ClaimCreateResponse> {
+    const pictures: File[] = []
+    const lines = request.lines.map(({ pictures: linePictures, ...line }) => {
+      const pictureIndexes = (linePictures ?? []).map(picture => {
+        pictures.push(picture)
+        return pictures.length
+      })
+      return pictureIndexes.length ? { ...line, pictureIndexes } : line
+    })
+    const payload = { ...request, lines }
+    const form = new FormData()
+    form.append('request', JSON.stringify(payload))
+    for (const picture of pictures) form.append('pictures', picture, picture.name)
+    signal?.throwIfAborted()
+    const response = await fetch(`${this.http.getBaseUrl()}/ingress/returns/storefront/claims`, {
+      method: 'POST', signal, body: form,
+    })
+    if (!response.ok) throw await responseError(response)
+    return response.json() as Promise<ClaimCreateResponse>
   }
 
   async streamClaims(orderNumber: string, signal: AbortSignal, onChange: () => void): Promise<void> {
